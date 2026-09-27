@@ -93,7 +93,7 @@ class Finding:
     version: Optional[str] = None
     recommendation: str = ""
     references: List[str] = field(default_factory=list)
-    source: str = "AlaviTrace Core"
+    source: str = "ATrace Core"
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 @dataclass

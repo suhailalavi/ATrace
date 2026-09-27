@@ -1,3 +1,3 @@
 """
-Parsers module for converting external tool outputs into AlaviTrace data models.
+Parsers module for converting external tool outputs into ATrace data models.
 """

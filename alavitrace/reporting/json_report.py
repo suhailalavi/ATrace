@@ -8,7 +8,7 @@ from alavitrace.core.models import ScanResult, HttpResult, Finding
 from alavitrace.ai.models import AIAnalysisResult
 from alavitrace.analysis.prioritization import PrioritizationResult
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 def generate_json_report(
     scan_result: ScanResult,
@@ -16,7 +16,7 @@ def generate_json_report(
     prioritization_result: Any,
     ai_analysis: Optional[AIAnalysisResult],
     output_dir: str = "reports",
-    filename_prefix: str = "alavitrace"
+    filename_prefix: str = "atrace"
 ) -> str:
     """
     Generates a structured, machine-readable JSON security assessment report.
@@ -111,7 +111,7 @@ def generate_json_report(
 
     report_payload = {
         "metadata": {
-            "framework": "AlaviTrace",
+            "framework": "ATrace",
             "version": __version__,
             "timestamp": datetime.now().isoformat(),
             "target": scan_result.target.normalized,

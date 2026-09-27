@@ -2,7 +2,7 @@
 
 ## Overview
 
-In **AlaviTrace v0.1 (Phase 5)**, the multi-format reporting engine converts structured reconnaissance evidence, passive web findings, correlated vulnerability records, and AI-assisted analysis into standalone, professional reports in **JSON**, **Markdown**, and **HTML** formats.
+In **ATrace v0.1 (Phase 5)**, the multi-format reporting engine converts structured reconnaissance evidence, passive web findings, correlated vulnerability records, and AI-assisted analysis into standalone, professional reports in **JSON**, **Markdown**, and **HTML** formats.
 
 ---
 
@@ -45,7 +45,7 @@ Report files are saved with timestamps to prevent accidental overwriting:
 
 ```text
 reports/
-├── alavitrace_20260926_204637.json
-├── alavitrace_20260926_204637.md
-└── alavitrace_20260926_204637.html
+├── atrace_20260926_204637.json
+├── atrace_20260926_204637.md
+└── atrace_20260926_204637.html
 ```

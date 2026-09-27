@@ -7,14 +7,14 @@ from alavitrace.core.models import ScanResult, HttpResult, Finding
 from alavitrace.ai.models import AIAnalysisResult
 from alavitrace.analysis.prioritization import PrioritizationResult
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AlaviTrace Security Assessment - {target}</title>
+    <title>ATrace Security Assessment - {target}</title>
     <style>
         :root {{
             --bg-color: #f8fafc;
@@ -93,9 +93,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
     <div class="container">
         <header>
-            <h1>AlaviTrace Security Assessment</h1>
+            <h1>ATrace Security Assessment</h1>
             <div class="meta">
-                Target: <strong>{target}</strong> | Framework: AlaviTrace v{version} | Generated: {timestamp}
+                Target: <strong>{target}</strong> | Framework: ATrace v{version} | Generated: {timestamp}
             </div>
         </header>
 
@@ -142,7 +142,7 @@ def generate_html_report(
     prioritization_result: Any,
     ai_analysis: Optional[AIAnalysisResult],
     output_dir: str = "reports",
-    filename_prefix: str = "alavitrace"
+    filename_prefix: str = "atrace"
 ) -> str:
     """
     Generates a standalone HTML report displaying prioritized findings and vulnerability intelligence metrics.

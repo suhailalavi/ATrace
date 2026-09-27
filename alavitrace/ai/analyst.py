@@ -5,7 +5,7 @@ from alavitrace.analysis.prioritization import PrioritizationResult
 from alavitrace.ai.base import AIProvider
 from alavitrace.ai.models import AIAnalysisResult
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 class SecurityAnalyst:
     """

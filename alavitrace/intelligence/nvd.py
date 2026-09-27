@@ -9,7 +9,7 @@ from alavitrace.core.models import Severity
 from alavitrace.intelligence.base import VulnerabilityProvider
 from alavitrace.intelligence.models import VulnerabilityRecord, VulnQueryResult
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".alavitrace", "cache")
@@ -138,7 +138,7 @@ class NVDProvider(VulnerabilityProvider):
             logger.info(f"Retrieved NVD vulnerability result for '{query_value}' from cache.")
             return cached
 
-        headers = {"User-Agent": "AlaviTrace-Recon/0.1"}
+        headers = {"User-Agent": "ATrace-Recon/0.1"}
         if self.api_key:
             headers["apiKey"] = self.api_key
 

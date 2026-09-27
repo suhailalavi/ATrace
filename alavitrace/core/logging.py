@@ -3,9 +3,9 @@ import sys
 
 def setup_logging(verbose: bool = False) -> logging.Logger:
     """
-    Configures structured console logging for AlaviTrace.
+    Configures structured console logging for ATrace.
     """
-    logger = logging.getLogger("AlaviTrace")
+    logger = logging.getLogger("ATrace")
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)
 
     # Avoid adding duplicate handlers if logger initialized multiple times

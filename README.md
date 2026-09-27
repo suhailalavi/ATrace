@@ -1,8 +1,8 @@
-# AlaviTrace
+# ATrace
 
 **AI-Assisted Reconnaissance & Security Intelligence Framework**
 
-AlaviTrace is an educational security intelligence orchestrator designed to automate repetitive early-stage reconnaissance and enumeration while keeping the human penetration tester in control of key security decisions.
+ATrace is an educational security intelligence orchestrator designed to automate repetitive early-stage reconnaissance and enumeration while keeping the human penetration tester in control of key security decisions.
 
 ---
 
@@ -21,7 +21,7 @@ AlaviTrace is an educational security intelligence orchestrator designed to auto
 - **Offline Test Suite**: 54 automated unit tests covering validation, scanner error handling, XML parsing, HTTP response mocking, NVD API mocking, vulnerability prioritization & deduplication, AI provider fallback, and multi-format report generation.
 
 > [!IMPORTANT]
-> **Deterministic Evidence vs AI Explanation**: AlaviTrace uses established security tools and deterministic correlation for evidence collection. AI is introduced strictly as an explanatory layer over collected evidence—it does **not** perform autonomous exploitation or command execution.
+> **Deterministic Evidence vs AI Explanation**: ATrace uses established security tools and deterministic correlation for evidence collection. AI is introduced strictly as an explanatory layer over collected evidence—it does **not** perform autonomous exploitation or command execution.
 
 ---
 
@@ -52,8 +52,8 @@ AlaviTrace is an educational security intelligence orchestrator designed to auto
 ### 1. Installation
 
 ```bash
-git clone https://github.com/user/AlaviTrace.git
-cd AlaviTrace
+git clone https://github.com/user/ATrace.git
+cd ATrace
 python -m venv .venv
 .venv\Scripts\activate  # Windows
 pip install -r requirements.txt
@@ -81,4 +81,4 @@ python -m pytest tests/
 ## Authorized Use & Disclaimer
 
 > [!CAUTION]
-> **Authorization Requirement**: AlaviTrace is designed strictly for educational purposes, personal lab environments (e.g., Metasploitable, VulnHub Sunset), and authorized penetration testing engagements. Unauthorized scanning or testing of external targets is strictly illegal.
+> **Authorization Requirement**: ATrace is designed strictly for educational purposes, personal lab environments (e.g., Metasploitable, VulnHub Sunset), and authorized penetration testing engagements. Unauthorized scanning or testing of external targets is strictly illegal.

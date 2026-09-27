@@ -75,7 +75,7 @@ def test_markdown_report_generation(tmp_path, sample_scan_data):
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
 
-    assert "# AlaviTrace Security Assessment Report" in content
+    assert "# ATrace Security Assessment Report" in content
     assert "`192.168.56.106`" in content
     assert "OpenSSH" in content
     assert "CVE-2019-6111" in content
@@ -89,7 +89,7 @@ def test_html_report_generation(tmp_path, sample_scan_data):
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
 
-    assert "AlaviTrace Security Assessment" in content
+    assert "ATrace Security Assessment" in content
     assert "192.168.56.106" in content
     assert "badge-MEDIUM" in content
     assert "CVE-2019-6111" in content

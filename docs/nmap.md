@@ -2,9 +2,9 @@
 
 ## Overview
 
-**Nmap (Network Mapper)** is an industry-standard open-source tool used for network discovery and vulnerability auditing. In **AlaviTrace v0.1**, Nmap serves as the primary network reconnaissance engine.
+**Nmap (Network Mapper)** is an industry-standard open-source tool used for network discovery and vulnerability auditing. In **ATrace v0.1**, Nmap serves as the primary network reconnaissance engine.
 
-AlaviTrace does not recreate Nmap's raw network scanning capabilities in Python. Instead, it acts as an **orchestration and intelligence layer**: it invokes Nmap safely, parses machine-readable XML results into structured data models, and prepares the data for downstream vulnerability intelligence and AI-assisted analysis.
+ATrace does not recreate Nmap's raw network scanning capabilities in Python. Instead, it acts as an **orchestration and intelligence layer**: it invokes Nmap safely, parses machine-readable XML results into structured data models, and prepares the data for downstream vulnerability intelligence and AI-assisted analysis.
 
 ---
 
@@ -42,7 +42,7 @@ Understanding the difference between each stage of network discovery is critical
 
 ## Safe Subprocess Execution in Python
 
-AlaviTrace executes Nmap using Python's `subprocess.run(shell=False)`:
+ATrace executes Nmap using Python's `subprocess.run(shell=False)`:
 
 ```python
 cmd = ["nmap", "-sV", "-oX", temp_xml_path, target.normalized]

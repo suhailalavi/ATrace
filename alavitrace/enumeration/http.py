@@ -4,7 +4,7 @@ import requests
 from typing import List, Tuple, Optional, Dict
 from alavitrace.core.models import Host, Service, HttpResult
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 # Standard HTTP security headers evaluated during passive reconnaissance
 SECURITY_HEADERS = [
@@ -47,7 +47,7 @@ class HttpEnumerator:
     Performs non-intrusive passive HTTP/HTTPS response inspection and security header analysis.
     """
 
-    def __init__(self, user_agent: str = "AlaviTrace-Recon/0.1", timeout_seconds: int = 10):
+    def __init__(self, user_agent: str = "ATrace-Recon/0.1", timeout_seconds: int = 10):
         self.user_agent = user_agent
         self.timeout_seconds = timeout_seconds
 

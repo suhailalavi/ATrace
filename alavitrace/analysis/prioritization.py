@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Any, Optional, Set
 from alavitrace.core.models import Finding, Severity, Confidence
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 SEVERITY_WEIGHTS: Dict[Severity, int] = {
     Severity.CRITICAL: 100,

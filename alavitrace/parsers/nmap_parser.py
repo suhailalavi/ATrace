@@ -5,7 +5,7 @@ from typing import List, Optional, Dict
 from alavitrace.core.models import Target, Host, Service, ScanResult
 from alavitrace.core.validator import validate_target
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 COMMON_PORT_SERVICES: Dict[int, str] = {
     21: "FTP",
@@ -40,7 +40,7 @@ def classify_service(port: int, nmap_service_name: Optional[str] = None) -> str:
 
 class NmapParser:
     """
-    Parses machine-readable Nmap XML files into AlaviTrace Host, Service, and ScanResult models.
+    Parses machine-readable Nmap XML files into ATrace Host, Service, and ScanResult models.
     """
 
     @staticmethod

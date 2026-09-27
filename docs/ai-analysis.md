@@ -2,7 +2,7 @@
 
 ## Overview
 
-In **AlaviTrace v0.1 (Phase 5)**, the AI Security Analysis layer synthesizes, explains, and prioritizes technical findings collected during automated reconnaissance and vulnerability correlation.
+In **ATrace v0.1 (Phase 5)**, the AI Security Analysis layer synthesizes, explains, and prioritizes technical findings collected during automated reconnaissance and vulnerability correlation.
 
 The AI component operates **strictly as an explanation, summarization, and investigation guidance engine**. It does **not** perform autonomous scanning, command execution, or vulnerability exploitation.
 
@@ -33,7 +33,7 @@ The AI component operates **strictly as an explanation, summarization, and inves
 
 ## AI Input & Privacy Controls
 
-Before sending evidence to the Google Gemini API (`gemini-2.5-flash`), AlaviTrace serializes the data into a compact, sanitized JSON structure.
+Before sending evidence to the Google Gemini API (`gemini-2.5-flash`), ATrace serializes the data into a compact, sanitized JSON structure.
 
 ### What is Included:
 - Target address (IPv4 / Hostname)
@@ -50,7 +50,7 @@ Before sending evidence to the Google Gemini API (`gemini-2.5-flash`), AlaviTrac
 
 ## Provider Abstraction & API Configuration
 
-AlaviTrace defines an abstract `AIProvider` base class, allowing seamless substitution of AI models or local LLM runtimes:
+ATrace defines an abstract `AIProvider` base class, allowing seamless substitution of AI models or local LLM runtimes:
 
 ```python
 class AIProvider(ABC):
@@ -61,4 +61,4 @@ class AIProvider(ABC):
 
 ### API Key Configuration
 - The `GeminiAIProvider` checks for the `GEMINI_API_KEY` environment variable.
-- **Graceful Fallback**: If `GEMINI_API_KEY` is missing or the API call fails/times out, AlaviTrace logs a clear notification (`"AI Analysis Status: GEMINI_API_KEY environment variable not configured."`) and continues to render the complete deterministic assessment report.
+- **Graceful Fallback**: If `GEMINI_API_KEY` is missing or the API call fails/times out, ATrace logs a clear notification (`"AI Analysis Status: GEMINI_API_KEY environment variable not configured."`) and continues to render the complete deterministic assessment report.

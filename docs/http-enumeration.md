@@ -2,9 +2,9 @@
 
 ## Overview
 
-In **AlaviTrace v0.1 (Phase 3)**, passive HTTP/HTTPS enumeration acts as a conditional analysis layer. When Nmap identifies open web services (e.g. ports 80, 443, 8080, 8443), AlaviTrace automatically executes non-intrusive HTTP GET requests to inspect server response headers and security configuration indicators.
+In **ATrace v0.1 (Phase 3)**, passive HTTP/HTTPS enumeration acts as a conditional analysis layer. When Nmap identifies open web services (e.g. ports 80, 443, 8080, 8443), ATrace automatically executes non-intrusive HTTP GET requests to inspect server response headers and security configuration indicators.
 
-AlaviTrace does **not** perform intrusive web attacks, directory brute forcing, or exploitation. All recommendations generated in Phase 3 are **deterministic, reproducible security hardening guidelines** based solely on observed HTTP header configurations.
+ATrace does **not** perform intrusive web attacks, directory brute forcing, or exploitation. All recommendations generated in Phase 3 are **deterministic, reproducible security hardening guidelines** based solely on observed HTTP header configurations.
 
 ---
 
@@ -49,7 +49,7 @@ AlaviTrace does **not** perform intrusive web attacks, directory brute forcing, 
 
 1. **Passive Operations Only**: Uses single HTTP GET requests without aggressive fuzzing or payload injection.
 2. **Explicit Timeouts**: Hardened timeout (`10 seconds`) to prevent hangs on unresponsive servers.
-3. **Safe Subprocess & Header Limits**: Standard User-Agent (`AlaviTrace-Recon/0.1`), no arbitrary user-supplied headers or methods.
+3. **Safe Subprocess & Header Limits**: Standard User-Agent (`ATrace-Recon/0.1`), no arbitrary user-supplied headers or methods.
 4. **Conditional Execution**: Web enumeration runs **only** if Nmap detects an active HTTP/HTTPS service.
 
 ---

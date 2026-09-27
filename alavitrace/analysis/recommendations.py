@@ -10,7 +10,7 @@ from alavitrace.core.models import (
     ActionImpact
 )
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 class RecommendationEngine:
     """
@@ -50,7 +50,7 @@ class RecommendationEngine:
                     affected_asset=target_asset,
                     recommendation="Configure the web server to send 'X-Content-Type-Options: nosniff'.",
                     references=["https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options"],
-                    source="AlaviTrace Security Header Rules"
+                    source="ATrace Security Header Rules"
                 ))
 
             elif missing_header == "Content-Security-Policy":
@@ -65,7 +65,7 @@ class RecommendationEngine:
                     affected_asset=target_asset,
                     recommendation="Implement a Content-Security-Policy appropriate for the application.",
                     references=["https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP"],
-                    source="AlaviTrace Security Header Rules"
+                    source="ATrace Security Header Rules"
                 ))
 
             elif missing_header == "X-Frame-Options":
@@ -80,7 +80,7 @@ class RecommendationEngine:
                     affected_asset=target_asset,
                     recommendation="Configure 'X-Frame-Options: SAMEORIGIN' or 'DENY' to protect against clickjacking.",
                     references=["https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options"],
-                    source="AlaviTrace Security Header Rules"
+                    source="ATrace Security Header Rules"
                 ))
 
             elif missing_header == "Referrer-Policy":
@@ -95,7 +95,7 @@ class RecommendationEngine:
                     affected_asset=target_asset,
                     recommendation="Consider setting a Referrer-Policy such as 'strict-origin-when-cross-origin'.",
                     references=["https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy"],
-                    source="AlaviTrace Security Header Rules"
+                    source="ATrace Security Header Rules"
                 ))
 
             elif missing_header == "Permissions-Policy":
@@ -110,7 +110,7 @@ class RecommendationEngine:
                     affected_asset=target_asset,
                     recommendation="Consider setting a Permissions-Policy to restrict browser feature usage.",
                     references=["https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy"],
-                    source="AlaviTrace Security Header Rules"
+                    source="ATrace Security Header Rules"
                 ))
 
             elif missing_header == "Strict-Transport-Security" and is_https:
@@ -125,7 +125,7 @@ class RecommendationEngine:
                     affected_asset=target_asset,
                     recommendation="Configure 'Strict-Transport-Security: max-age=31536000; includeSubDomains' on HTTPS servers.",
                     references=["https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security"],
-                    source="AlaviTrace Security Header Rules"
+                    source="ATrace Security Header Rules"
                 ))
 
         # 2. Evaluate Server Version Disclosure
@@ -141,7 +141,7 @@ class RecommendationEngine:
                 affected_asset=target_asset,
                 recommendation="Consider minimizing detailed software version disclosure in HTTP Server response headers.",
                 references=["https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html"],
-                source="AlaviTrace Information Disclosure Rules"
+                source="ATrace Information Disclosure Rules"
             ))
 
         # 3. Evaluate HTTP to HTTPS Redirection
@@ -160,7 +160,7 @@ class RecommendationEngine:
                     affected_asset=target_asset,
                     recommendation="Maintain secure TLS enforcement across all web endpoints.",
                     references=["https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Protection_Cheat_Sheet.html"],
-                    source="AlaviTrace Configuration Rules"
+                    source="ATrace Configuration Rules"
                 ))
 
         logger.info(f"Generated {len(findings)} deterministic recommendations for {http_result.url}")

@@ -30,7 +30,7 @@ from alavitrace.reporting.html_report import generate_html_report
 
 BANNER = f"""
 ================================================================
-  ALAVITRACE v{__version__}
+  ATRACE v{__version__}
   AI-Assisted Reconnaissance & Security Intelligence Framework
 ================================================================
   AUTHORIZATION REMINDER:
@@ -41,7 +41,7 @@ BANNER = f"""
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser(
-        description="AlaviTrace - AI-Assisted Reconnaissance & Security Intelligence Framework"
+        description="ATrace - AI-Assisted Reconnaissance & Security Intelligence Framework"
     )
     parser.add_argument(
         "-t", "--target",
@@ -276,7 +276,7 @@ def run_pipeline(
     output_dir: str = "reports",
     report_format: str = "all"
 ) -> int:
-    """Executes the Phase 4.1 Prioritized AlaviTrace Pipeline."""
+    """Executes the Phase 4.1 Prioritized ATrace Pipeline."""
     logger = setup_logging(verbose=verbose)
 
     if max_findings < 1:

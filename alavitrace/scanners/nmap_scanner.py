@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional, Tuple
 from alavitrace.core.models import Target
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 class NmapError(Exception):
     """Base exception for Nmap scanner operations."""

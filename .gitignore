@@ -15,7 +15,7 @@ env/
 *.key
 *.pem
 
-# AlaviTrace cache
+# ATrace cache
 .alavitrace/
 cache/
 

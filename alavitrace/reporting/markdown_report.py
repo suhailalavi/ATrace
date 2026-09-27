@@ -7,7 +7,7 @@ from alavitrace.core.models import ScanResult, HttpResult, Finding
 from alavitrace.ai.models import AIAnalysisResult
 from alavitrace.analysis.prioritization import PrioritizationResult
 
-logger = logging.getLogger("AlaviTrace")
+logger = logging.getLogger("ATrace")
 
 def generate_markdown_report(
     scan_result: ScanResult,
@@ -15,7 +15,7 @@ def generate_markdown_report(
     prioritization_result: Any,
     ai_analysis: Optional[AIAnalysisResult],
     output_dir: str = "reports",
-    filename_prefix: str = "alavitrace"
+    filename_prefix: str = "atrace"
 ) -> str:
     """
     Generates a professional Markdown security assessment report featuring prioritized vulnerability intelligence.
@@ -33,8 +33,8 @@ def generate_markdown_report(
     prioritized_findings = prioritization_result.prioritized_findings
 
     lines: List[str] = [
-        f"# AlaviTrace Security Assessment Report",
-        f"**Framework Version:** AlaviTrace v{__version__}  ",
+        f"# ATrace Security Assessment Report",
+        f"**Framework Version:** ATrace v{__version__}  ",
         f"**Target Asset:** `{target_str}` ({scan_result.target.target_type})  ",
         f"**Assessment Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ",
         "",
@@ -47,7 +47,7 @@ def generate_markdown_report(
     if ai_analysis and ai_analysis.is_available and ai_analysis.executive_summary:
         lines.append(f"{ai_analysis.executive_summary}\n")
     else:
-        lines.append(f"AlaviTrace completed automated security reconnaissance, passive HTTP inspection, and vulnerability intelligence correlation against target `{target_str}`.\n")
+        lines.append(f"ATrace completed automated security reconnaissance, passive HTTP inspection, and vulnerability intelligence correlation against target `{target_str}`.\n")
 
     # Executive Vulnerability Summary Box
     lines.append("### Vulnerability Intelligence Summary")
