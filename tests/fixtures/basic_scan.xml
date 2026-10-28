@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<nmaprun scanner="nmap" args="nmap -sV -oX output.xml 192.168.56.106" start="1690000000" version="7.94">
+<host starttime="1690000000" endtime="1690000010">
+<status state="up" reason="arp-response"/>
+<address addr="192.168.56.106" addrtype="ipv4"/>
+<hostnames>
+  <hostname name="sunset.local" type="user"/>
+</hostnames>
+<ports>
+  <port protocol="tcp" portid="21">
+    <state state="open" reason="syn-ack"/>
+    <service name="ftp" product="pyftpdlib" version="1.5.5" method="probed" conf="10">
+      <cpe>cpe:/a:giorgio_gould:pyftpdlib:1.5.5</cpe>
+    </service>
+  </port>
+  <port protocol="tcp" portid="22">
+    <state state="open" reason="syn-ack"/>
+    <service name="ssh" product="OpenSSH" version="7.9p1" extrainfo="Debian 10" method="probed" conf="10">
+      <cpe>cpe:/a:openbsd:openssh:7.9p1</cpe>
+    </service>
+  </port>
+</ports>
+<os>
+  <osmatch name="Linux 4.15 - 5.8" accuracy="95"/>
+  <cpe>cpe:/o:linux:linux_kernel</cpe>
+</os>
+</host>
+</nmaprun>

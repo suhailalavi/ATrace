@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" args="nmap -sV 192.168.56.200">
+<host>
+  <status state="up"/>
+  <address addr="192.168.56.200" addrtype="ipv4"/>
+  <ports>
+    <extraports state="closed" count="1000"/>
+  </ports>
+</host>
+</nmaprun>

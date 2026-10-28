@@ -3,18 +3,18 @@ import logging
 from datetime import datetime
 from typing import List, Optional, Any
 from alavitrace import __version__
-from alavitrace.core.models import ScanResult, HttpResult, Finding
+from alavitrace.core.models import ScanResult, HttpResult, Finding, Severity
 from alavitrace.ai.models import AIAnalysisResult
 from alavitrace.analysis.prioritization import PrioritizationResult
 
-logger = logging.getLogger("ATrace")
+logger = logging.getLogger("AlaviTrace")
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATrace Security Assessment - {target}</title>
+    <title>AlaviTrace Security Assessment - {target}</title>
     <style>
         :root {{
             --bg-color: #f8fafc;
@@ -85,6 +85,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .badge-MEDIUM {{ background-color: var(--sev-medium); }}
         .badge-LOW {{ background-color: var(--sev-low); }}
         .badge-INFO {{ background-color: var(--sev-info); }}
+        .badge-VALIDATED {{ background-color: #16a34a; }}
+        .badge-NOT_VALIDATED {{ background-color: #64748b; }}
+        .badge-INCONCLUSIVE {{ background-color: #d97706; }}
+        .badge-NOT_APPLICABLE {{ background-color: #475569; }}
+        .badge-ERROR {{ background-color: #dc2626; }}
         .code {{ font-family: monospace; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }}
         .disclaimer {{ background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; font-size: 13px; color: #1e40af; margin-bottom: 20px; }}
         .vuln-summary-box {{ background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }}
@@ -93,9 +98,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
     <div class="container">
         <header>
-            <h1>ATrace Security Assessment</h1>
+            <h1>AlaviTrace Security Assessment</h1>
             <div class="meta">
-                Target: <strong>{target}</strong> | Framework: ATrace v{version} | Generated: {timestamp}
+                Target: <strong>{target}</strong> | Framework: AlaviTrace v{version} | Generated: {timestamp}
             </div>
         </header>
 
@@ -111,6 +116,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         {http_section}
+
+        {attack_surface_section}
+
+        {owasp_section}
+
+        {owasp_coverage_section}
 
         <div class="card">
             <h2>Prioritized Vulnerability Intelligence & Security Findings</h2>
@@ -142,7 +153,10 @@ def generate_html_report(
     prioritization_result: Any,
     ai_analysis: Optional[AIAnalysisResult],
     output_dir: str = "reports",
-    filename_prefix: str = "atrace"
+    filename_prefix: str = "alavitrace",
+    owasp_result: Optional[Any] = None,
+    attack_surface: Optional[Any] = None,
+    assessment: Optional[Any] = None
 ) -> str:
     """
     Generates a standalone HTML report displaying prioritized findings and vulnerability intelligence metrics.
@@ -206,28 +220,187 @@ def generate_html_report(
             """)
         http_html = f"<div class='card'><h2>Passive HTTP Enumeration</h2>{''.join(http_cards)}</div>"
 
-    # 4. Findings Content HTML
+    # Attack Surface HTML (Phase 10)
+    attack_surface_html = ""
+    if attack_surface:
+        tech_badges = []
+        for t in getattr(attack_surface, "technologies", []):
+            ver = f" {t.version}" if getattr(t, "version", None) else ""
+            tech_badges.append(f"<span class='badge badge-LOW'>{t.name}{ver}</span>")
+        tech_html = " ".join(tech_badges) if tech_badges else "<em>None detected</em>"
+
+        ep_rows = []
+        for ep in getattr(attack_surface, "endpoints", [])[:30]:
+            p_str = ", ".join(f"<span class='code'>{p}</span>" for p in ep.parameters) if ep.parameters else "-"
+            st = f"<span class='code'>{ep.status_code}</span>" if ep.status_code else "-"
+            ep_rows.append(f"""
+            <tr>
+                <td><strong>{ep.method}</strong></td>
+                <td><span class='code'>{ep.path}</span></td>
+                <td>{st}</td>
+                <td>{p_str}</td>
+                <td><small style='color: #64748b;'>{ep.source}</small></td>
+            </tr>
+            """)
+        ep_table = f"""
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Path</th>
+                    <th>Status</th>
+                    <th>Parameters</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                {''.join(ep_rows)}
+            </tbody>
+        </table>
+        """ if ep_rows else "<p>No endpoints discovered.</p>"
+
+        attack_surface_html = f"""
+        <div class="card">
+            <h2>Attack Surface & Web Endpoint Discovery</h2>
+            <p style="font-size: 13px; color: #475569;">
+                <strong>Inventory Note:</strong> Discovered endpoints and technologies represent observable attack surface inventory, not security vulnerabilities.
+            </p>
+            <p><strong>Identified Technologies:</strong> {tech_html}</p>
+            <p><strong>Total Endpoints:</strong> {len(getattr(attack_surface, 'endpoints', []))} | <strong>Exposed Parameters:</strong> {len(getattr(attack_surface, 'parameters', []))}</p>
+            {ep_table}
+        </div>
+        """
+
+    # 4. OWASP Web Security Assessment HTML
+    owasp_html = ""
+    if owasp_result:
+        if not getattr(owasp_result, "is_http_available", False):
+            owasp_html = """
+            <div class='card'>
+                <h2>OWASP Web Security Assessment</h2>
+                <p><em>No HTTP/HTTPS service detected; OWASP web assessment skipped.</em></p>
+            </div>
+            """
+        else:
+            owasp_findings = getattr(owasp_result, "findings", [])
+            if not owasp_findings:
+                owasp_html = """
+                <div class='card'>
+                    <h2>OWASP Web Security Assessment</h2>
+                    <p>No specific OWASP web security vulnerabilities identified.</p>
+                </div>
+                """
+            else:
+                crit = sum(1 for f in owasp_findings if f.severity == Severity.CRITICAL)
+                high = sum(1 for f in owasp_findings if f.severity == Severity.HIGH)
+                med = sum(1 for f in owasp_findings if f.severity == Severity.MEDIUM)
+                low = sum(1 for f in owasp_findings if f.severity == Severity.LOW)
+                info = sum(1 for f in owasp_findings if f.severity == Severity.INFO)
+
+                a03_findings = [
+                    f for f in owasp_findings
+                    if (getattr(f, "owasp_category", None) and "A03" in f.owasp_category)
+                    or "Injection" in f.title or "XSS" in f.title
+                ]
+                inj_note = ""
+                if a03_findings:
+                    sqli = sum(1 for f in a03_findings if "SQL" in f.title)
+                    xss = sum(1 for f in a03_findings if "XSS" in f.title)
+                    cmd = sum(1 for f in a03_findings if "Command" in f.title)
+                a05_count = sum(1 for f in owasp_findings if getattr(f, "owasp_category", None) and "A05" in f.owasp_category)
+                a06_count = sum(1 for f in owasp_findings if getattr(f, "owasp_category", None) and "A06" in f.owasp_category)
+                highlights_note = f"""
+                <p style="margin-bottom: 8px; font-size: 13px; color: #475569;">
+                    <strong>Key Category Counts:</strong> A05 Misconfigurations: <strong>{a05_count}</strong> | A06 Outdated Components: <strong>{a06_count}</strong> | A03 Injection Candidates: <strong>{len(a03_findings)}</strong>
+                </p>
+                """
+
+                metrics_html = f"""
+                <p style="margin-bottom: 6px;">
+                    <strong>Findings Summary:</strong>
+                    <span class="badge badge-CRITICAL">Critical: {crit}</span>
+                    <span class="badge badge-HIGH">High: {high}</span>
+                    <span class="badge badge-MEDIUM">Medium: {med}</span>
+                    <span class="badge badge-LOW">Low: {low}</span>
+                    <span class="badge badge-INFO">Info: {info}</span>
+                </p>
+                {highlights_note}
+                {inj_note}
+                """
+
+                owasp_rows = []
+                for f in owasp_findings:
+                    sev_class = f"badge-{f.severity.name}"
+                    owasp_cat = f.owasp_category or "N/A"
+                    lim = getattr(f, "limitations", "") or "Manual validation required."
+                    owasp_rows.append(f"""
+                    <tr>
+                        <td><span class="badge {sev_class}">{f.severity.value}</span></td>
+                        <td><strong>{f.title}</strong><br><small style="color: #64748b;">{owasp_cat}</small></td>
+                        <td><span class="code">{f.endpoint or f.affected_asset}</span></td>
+                        <td>{f.evidence}</td>
+                        <td>{f.recommendation}</td>
+                        <td><small style="color: #64748b;">{lim}</small></td>
+                    </tr>
+                    """)
+                owasp_html = f"""
+                <div class='card'>
+                    <h2>OWASP Web Security Assessment</h2>
+                    {metrics_html}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Severity</th>
+                                <th>Finding Title & OWASP Category</th>
+                                <th>Endpoint</th>
+                                <th>Evidence</th>
+                                <th>Recommendation</th>
+                                <th>Limitations</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {''.join(owasp_rows)}
+                        </tbody>
+                    </table>
+                </div>
+                """
+
+    # 5. Findings Content HTML
+    has_validation = any(getattr(f, "validation_result", None) is not None for f in prioritized_findings)
     if not prioritized_findings:
         findings_content = "<p>No specific vulnerability or security header findings identified.</p>"
     else:
         finding_rows = []
         for f in prioritized_findings:
             sev_class = f"badge-{f.severity.name}"
+            val_td = ""
+            if has_validation:
+                if getattr(f, "validation_result", None):
+                    vr = f.validation_result
+                    val_class = f"badge-{vr.status.value}"
+                    lim_html = f"<br><small style='color: #94a3b8; font-style: italic;'>{vr.limitations}</small>" if getattr(vr, "limitations", None) else ""
+                    val_td = f"<td><span class='badge {val_class}'>{vr.status.value}</span><br><small style='color: #64748b;'>{vr.validation_method}</small>{lim_html}</td>"
+                else:
+                    val_td = "<td><small style='color: #64748b;'>N/A</small></td>"
+
             finding_rows.append(f"""
             <tr>
                 <td><span class="badge {sev_class}">{f.severity.value}</span></td>
                 <td><strong>{f.title}</strong><br><small>{f.id}</small></td>
+                {val_td}
                 <td><span class="code">{f.affected_asset}</span></td>
                 <td>{f.evidence}</td>
                 <td>{f.recommendation}</td>
             </tr>
             """)
+        val_th = "<th>Validation Status</th>" if has_validation else ""
         findings_content = f"""
         <table>
             <thead>
                 <tr>
                     <th>Severity</th>
                     <th>Finding Title</th>
+                    {val_th}
                     <th>Asset</th>
                     <th>Evidence</th>
                     <th>Recommendation</th>
@@ -242,6 +415,35 @@ def generate_html_report(
     additional_cves = max(0, prioritization_result.total_correlated - prioritization_result.prioritized_count)
     additional_note = f"<p style='color: #64748b; font-size: 13px;'><em>{additional_cves} additional correlated CVEs are preserved in the full JSON report.</em></p>" if additional_cves > 0 else ""
 
+    from alavitrace.assessment.coverage import get_owasp_coverage_summary
+    owasp_cov = get_owasp_coverage_summary(prioritization_result.all_findings)
+    cov_rows = []
+    for code, item in owasp_cov.categories.items():
+        supp_badge = "<span class='badge badge-VALIDATED'>Supported</span>" if item.support_level == "Supported" else "<span class='badge badge-INFO'>Architectural Review</span>"
+        caps = "; ".join(item.capabilities[:2]) if item.capabilities else item.limitations[0][:75] + "..."
+        cov_rows.append(f"<tr><td><span class='code'>{item.code}</span></td><td>{item.name}</td><td>{supp_badge}</td><td>{item.findings_count}</td><td><small>{caps}</small></td></tr>")
+
+    cov_table = f"""
+    <div class='card'>
+        <h2>OWASP Top 10 (2021) Coverage Matrix</h2>
+        <p style='font-size: 13px; color: #475569;'><strong>Taxonomy Accounting:</strong> 7 Supported (deterministic detection & validation), 3 Architectural Review (source code / threat model boundaries).</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Name</th>
+                    <th>Support Level</th>
+                    <th>Findings</th>
+                    <th>Capabilities & Boundaries</th>
+                </tr>
+            </thead>
+            <tbody>
+                {''.join(cov_rows)}
+            </tbody>
+        </table>
+    </div>
+    """
+
     full_html = HTML_TEMPLATE.format(
         target=target_str,
         version=__version__,
@@ -249,6 +451,9 @@ def generate_html_report(
         ai_section=ai_html,
         recon_content=recon_content,
         http_section=http_html,
+        attack_surface_section=attack_surface_html,
+        owasp_section=owasp_html,
+        owasp_coverage_section=cov_table,
         total_correlated=prioritization_result.total_correlated,
         prioritized_count=prioritization_result.prioritized_count,
         findings_content=findings_content,

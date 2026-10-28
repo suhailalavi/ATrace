@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" args="nmap -sV 192.168.56.103">
+<host>
+  <status state="up"/>
+  <address addr="192.168.56.103" addrtype="ipv4"/>
+  <ports>
+    <port protocol="tcp" portid="22">
+      <state state="open"/>
+      <service name="ssh"/>
+    </port>
+    <port protocol="tcp" portid="9999">
+      <state state="filtered"/>
+    </port>
+  </ports>
+</host>
+</nmaprun>

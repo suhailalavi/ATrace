@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Any, Optional, Set
 from alavitrace.core.models import Finding, Severity, Confidence
 
-logger = logging.getLogger("ATrace")
+logger = logging.getLogger("AlaviTrace")
 
 SEVERITY_WEIGHTS: Dict[Severity, int] = {
     Severity.CRITICAL: 100,
@@ -17,7 +17,8 @@ CONFIDENCE_WEIGHTS: Dict[Confidence, int] = {
     Confidence.PROBABLE: 50,
     Confidence.POTENTIAL: 25,
     Confidence.CONFIRMED: 50,
-    Confidence.INFORMATIONAL: 10
+    Confidence.INFORMATIONAL: 10,
+    Confidence.OBSERVED: 45
 }
 
 @dataclass
@@ -61,14 +62,29 @@ class VulnerabilityPrioritizer:
                 pass
 
         cvss_weight = int(cvss_score * 10)
-        exposure_weight = 20 if finding.affected_port else 0
+        exposure_weight = 20 if (finding.affected_port or finding.endpoint) else 0
 
-        total_score = sev_score + conf_score + cvss_weight + exposure_weight
+        # Phase 11: Documented validation evidence factor
+        validation_bonus = 0
+        validation_note = ""
+        if hasattr(finding, "validation_result") and finding.validation_result is not None:
+            vr_status = getattr(finding.validation_result, "status", None)
+            status_str = vr_status.value if hasattr(vr_status, "value") else str(vr_status)
+            if status_str == "VALIDATED":
+                validation_bonus = 30
+                validation_note = ", Validation (VALIDATED): +30pts"
+            elif status_str == "NOT_VALIDATED":
+                validation_bonus = -15
+                validation_note = ", Validation (NOT_VALIDATED): -15pts"
+            else:
+                validation_note = f", Validation ({status_str}): 0pts"
+
+        total_score = sev_score + conf_score + cvss_weight + exposure_weight + validation_bonus
 
         rationale = (
             f"Score: {total_score} (Severity {finding.severity.value}: {sev_score}pts, "
             f"Confidence {finding.confidence.value}: {conf_score}pts, "
-            f"CVSS {cvss_score}: {cvss_weight}pts, Exposed Port: {exposure_weight}pts)"
+            f"CVSS {cvss_score}: {cvss_weight}pts, Exposed Port: {exposure_weight}pts{validation_note})"
         )
 
         return total_score, rationale
@@ -136,15 +152,24 @@ class VulnerabilityPrioritizer:
 
         # Deterministic sorting: Score DESC -> CVSS DESC -> Title ASC
         scored_findings.sort(key=lambda x: (-x[0], -x[1], x[2].title))
-
         sorted_vuln_findings = [item[2] for item in scored_findings]
 
-        # Combine sorted vulnerabilities with non-vulnerability findings (security header recommendations)
-        all_retained_findings = sorted_vuln_findings + non_vuln_findings
+        # Deduplicate non-vulnerability findings by identity fingerprint
+        from alavitrace.assessment.engine import generate_finding_fingerprint
+        seen_fps: Set[str] = set()
+        dedup_non_vuln: List[Finding] = []
+        for f in non_vuln_findings:
+            fp = generate_finding_fingerprint(f)
+            if fp not in seen_fps:
+                seen_fps.add(fp)
+                dedup_non_vuln.append(f)
+
+        # Combine sorted vulnerabilities with non-vulnerability findings
+        all_retained_findings = sorted_vuln_findings + dedup_non_vuln
 
         # Select Top N prioritized vulnerability findings
         top_vuln_findings = sorted_vuln_findings[:max_findings]
-        prioritized_findings = top_vuln_findings + non_vuln_findings
+        prioritized_findings = top_vuln_findings + dedup_non_vuln
 
         notes: List[str] = []
         total_vuln_count = len(sorted_vuln_findings)

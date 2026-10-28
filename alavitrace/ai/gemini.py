@@ -9,7 +9,7 @@ from alavitrace.ai.base import AIProvider
 from alavitrace.ai.models import AIAnalysisResult
 from alavitrace.ai.prompts import SYSTEM_PROMPT, build_user_prompt
 
-logger = logging.getLogger("ATrace")
+logger = logging.getLogger("AlaviTrace")
 
 class GeminiAIProvider(AIProvider):
     """

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" args="nmap -sV 192.168.56.0/24">
+<host>
+  <status state="up"/>
+  <address addr="192.168.56.101" addrtype="ipv4"/>
+  <hostnames><hostname name="host1.lab"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="80">
+      <state state="open"/>
+      <service name="http" product="Apache httpd" version="2.4.41"/>
+    </port>
+  </ports>
+</host>
+<host>
+  <status state="up"/>
+  <address addr="192.168.56.102" addrtype="ipv4"/>
+  <hostnames><hostname name="host2.lab"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="445">
+      <state state="open"/>
+      <service name="microsoft-ds" product="Samba" version="4.11.6-Ubuntu"/>
+    </port>
+  </ports>
+</host>
+</nmaprun>

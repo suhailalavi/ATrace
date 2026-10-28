@@ -1,3 +1,3 @@
 """
-Scanners module for ATrace network reconnaissance engines.
+Scanners module for AlaviTrace network reconnaissance engines.
 """
