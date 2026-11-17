@@ -161,3 +161,155 @@ def test_reports_with_owasp_a05_and_a06(tmp_path, sample_scan_data):
     assert "A05 Misconfigurations" in html_text
     assert "A06 Outdated Components" in html_text
 
+def test_html_report_escaping_xss_protection(tmp_path):
+    from alavitrace.assessment.models import AssessmentResult, OWASPFinding, OwaspCategory
+    from alavitrace.attacksurface.models import AttackSurface, Endpoint, Parameter, Technology
+    from alavitrace.validation.models import ValidationResult, ValidationStatus
+
+    # Create target and hosts with malicious script strings
+    target = Target(raw_input="192.168.1.100", normalized="192.168.1.100<script>alert('xss-target')</script>", target_type="IPv4")
+    host = Host(
+        target=target,
+        ipv4="192.168.1.100<script>alert('xss-host')</script>",
+        state="up",
+        open_ports=[
+            Service(
+                port=80,
+                protocol="tcp<script>alert('xss-proto')</script>",
+                state="open",
+                name="http<script>alert('xss-name')</script>",
+                product="Apache\"><script>alert('xss-prod')</script>",
+                version="2.4.41<script>alert('xss-ver')</script>",
+                cpes=["cpe:2.3:a:apache:http_server:2.4.41<script>alert('xss-cpe')</script>"]
+            )
+        ]
+    )
+    scan_result = ScanResult(target=target, hosts=[host])
+
+    http_results = [
+        HttpResult(
+            url="http://192.168.1.100/<script>alert('xss-url')</script>",
+            status_code=200,
+            server_header="Apache<script>alert('xss-server')</script>",
+            missing_security_headers=["CSP<script>alert('xss-csp')</script>"]
+        ),
+        HttpResult(
+            url="http://192.168.1.100/err",
+            status_code=0,
+            error_message="Fail <img src=x onerror=alert('xss-err')>"
+        )
+    ]
+
+    val_res = ValidationResult(
+        finding_id="FIND-1",
+        target="192.168.1.100",
+        status=ValidationStatus.VALIDATED,
+        validation_method="canary-probe<script>alert('xss-val-meth')</script>",
+        limitations="limited<script>alert('xss-val-lim')</script>"
+    )
+
+    findings = [
+        Finding(
+            id="FIND-<script>alert('xss-f-id')</script>",
+            title="Finding <script>alert('xss-f-title')</script>",
+            category="Web",
+            severity=Severity.HIGH,
+            confidence=Confidence.CONFIRMED,
+            description="Desc <script>alert('xss-f-desc')</script>",
+            evidence="Evidence <script>alert('xss-f-ev')</script>",
+            affected_asset="Asset <script>alert('xss-f-asset')</script>",
+            recommendation="Rec <script>alert('xss-f-rec')</script>",
+            validation_result=val_res
+        )
+    ]
+
+    ai_analysis = AIAnalysisResult(
+        executive_summary="Exec <script>alert('xss-ai-exec')</script>",
+        attack_surface_summary="Surface <script>alert('xss-ai-surf')</script>",
+        key_observations=["Obs <script>alert('xss-ai-obs')</script>"],
+        investigation_priorities=["Prio <script>alert('xss-ai-prio')</script>"],
+        remediation_summary=["Rem <script>alert('xss-ai-rem')</script>"],
+        limitations=["Lim <script>alert('xss-ai-lim')</script>"]
+    )
+
+    owasp_finding = OWASPFinding.create(
+        id="OWASP-A03-TEST",
+        title="OWASP Title <script>alert('xss-owasp-title')</script>",
+        owasp_category="A03:2021<script>alert('xss-owasp-cat')</script>",
+        severity=Severity.CRITICAL,
+        confidence=Confidence.CONFIRMED,
+        description="OWASP Desc <script>alert('xss-owasp-desc')</script>",
+        evidence="OWASP Ev <script>alert('xss-owasp-ev')</script>",
+        affected_asset="OWASP Asset <script>alert('xss-owasp-asset')</script>",
+        endpoint="/vuln<script>alert('xss-owasp-ep')</script>",
+        recommendation="OWASP Rec <script>alert('xss-owasp-rec')</script>",
+        limitations="OWASP Lim <script>alert('xss-owasp-lim')</script>"
+    )
+    owasp_result = AssessmentResult(
+        is_http_available=True,
+        findings=[owasp_finding],
+        executed_checks=["A03"],
+        supported_categories=["A03:2021"]
+    )
+
+    tech = Technology(name="Express<script>alert('xss-tech')</script>", version="4.18<script>alert('xss-techver')</script>")
+    ep = Endpoint(
+        url="http://192.168.1.100/test",
+        path="/test<script>alert('xss-ep-path')</script>",
+        method="GET<script>alert('xss-ep-method')</script>",
+        status_code=200,
+        parameters=["q<script>alert('xss-ep-param')</script>"],
+        source="crawl<script>alert('xss-ep-source')</script>"
+    )
+    attack_surface = AttackSurface(
+        target="192.168.1.100",
+        endpoints=[ep],
+        technologies=[tech],
+        parameters=[Parameter(name="q", location="query", endpoint="/test")]
+    )
+
+    filepath = generate_html_report(
+        scan_result=scan_result,
+        http_results=http_results,
+        prioritization_result=findings,
+        ai_analysis=ai_analysis,
+        output_dir=str(tmp_path),
+        owasp_result=owasp_result,
+        attack_surface=attack_surface
+    )
+
+    assert os.path.exists(filepath)
+    with open(filepath, "r", encoding="utf-8") as f:
+        html_content = f.read()
+
+    # Verify that raw script tags and event handlers are NEVER rendered
+    assert "<script>alert(" not in html_content
+    assert "<img src=x onerror=" not in html_content
+    assert "\"><script>" not in html_content
+
+    # Verify that escaped representations ARE present
+    assert "&lt;script&gt;alert(" in html_content
+    assert "&lt;img src=x onerror=" in html_content
+    assert "&quot;&gt;&lt;script&gt;" in html_content
+
+    # Verify structural HTML markup remains valid and unescaped
+    assert "<!DOCTYPE html>" in html_content
+    assert "<html lang=\"en\">" in html_content
+    assert "<head>" in html_content
+    assert "<body>" in html_content
+    assert "<div class=\"container\">" in html_content
+    assert "badge-CRITICAL" in html_content
+    assert "badge-VALIDATED" in html_content
+    assert "<table>" in html_content
+    assert "<tr>" in html_content
+
+def test_html_report_special_characters_and_none_values(tmp_path):
+    from alavitrace.reporting.html_report import _escape
+
+    assert _escape(None) == ""
+    assert _escape("normal text") == "normal text"
+    assert _escape("foo & bar <baz> \"qux\" 'zap'") == "foo &amp; bar &lt;baz&gt; &quot;qux&quot; &#x27;zap&#x27;"
+    assert _escape(123) == "123"
+
+
+

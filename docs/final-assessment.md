@@ -8,17 +8,17 @@ This guide documents the usage, CLI flags, execution flows, and report outputs f
 
 ### Basic Assessment (All Features Enabled)
 ```bash
-python -m alavitrace.cli 192.168.56.106 --owasp --validate --attack-surface
+python -m alavitrace.cli -t 192.168.56.106 --owasp --validate --attack-surface
 ```
 
 ### Full Multi-Format Report Generation
 ```bash
-python -m alavitrace.cli example.com --owasp --validate --attack-surface --format all --output-dir ./reports
+python -m alavitrace.cli -t example.com --owasp --validate --attack-surface --format all --output-dir ./reports
 ```
 
 ### Air-Gapped / Offline Assessment
 ```bash
-python -m alavitrace.cli 127.0.0.1 --no-vuln-check --no-ai --format markdown
+python -m alavitrace.cli -t 127.0.0.1 --no-vuln-check --no-ai --format markdown
 ```
 
 ---
@@ -27,26 +27,26 @@ python -m alavitrace.cli 127.0.0.1 --no-vuln-check --no-ai --format markdown
 
 | Option | Description | Default |
 | :--- | :--- | :--- |
-| `target` | Target IPv4 address, hostname, or domain | *Required* |
+| `-t`, `--target` | Target IPv4 address, hostname, or domain | *Required* |
 | `--verbose`, `-v` | Enable verbose diagnostic logging | `False` |
-| `-Pn` | Skip Nmap ping/host discovery | `False` |
+| `--pn` | Skip Nmap ping/host discovery (-Pn in Nmap) | `False` |
 | `--keep-xml` | Retain temporary Nmap XML output file | `False` |
 | `--no-vuln-check` | Skip external NVD CVE intelligence queries | `False` |
 | `--vuln-provider` | Vulnerability intelligence provider | `nvd` |
 | `--max-findings` | Maximum prioritized candidates to highlight | `5` |
 | `--no-ai` | Disable Gemini AI contextual analysis | `False` |
-| `--owasp` | Enable OWASP Web Security Assessment Engine | `False` |
-| `--injection` | Enable controlled web injection probes | `False` |
-| `--max-injection-requests` | Max requests per parameter for injection checks | `10` |
-| `--misconfig` | Enable security misconfiguration auditing | `True` |
+| `--owasp` / `--no-owasp` | Enable/disable OWASP Web Security Assessment Engine | `True` |
+| `--injection` / `--no-injection` | Enable controlled web injection probes | `False` |
+| `--max-injection-requests` | Max requests for A03 injection checks | `20` |
+| `--misconfig` | Enable detailed security misconfiguration auditing | `False` |
 | `--validate` | Enable Controlled Finding Validation Framework | `False` |
-| `--validation-timeout` | Timeout in seconds per validation request | `5.0` |
+| `--validation-timeout` | Timeout in seconds per validation request | `5` |
 | `--max-validation-requests` | Max requests per finding during validation | `10` |
 | `--attack-surface` | Enable web attack-surface mapping & endpoint discovery | `False` |
-| `--max-depth` | Maximum crawling recursion depth | `2` |
+| `--max-depth` | Maximum crawling recursion depth | `1` |
 | `--max-requests` | Maximum HTTP requests during surface mapping | `20` |
 | `--output-dir`, `-o` | Output directory for assessment reports | `reports` |
-| `--format`, `-f` | Report formats: `json`, `markdown`, `html`, or `all` | `all` |
+| `--format` | Report formats: `json`, `markdown`, `html`, or `all` | `all` |
 
 ---
 

@@ -1,4 +1,4 @@
-# AlaviTrace (v1.0.0)
+# AlaviTrace (v1.0.1)
 
 **AI-Assisted Reconnaissance & Security Intelligence Framework**
 
@@ -6,7 +6,7 @@ AlaviTrace is an authorized cybersecurity reconnaissance and vulnerability asses
 
 ---
 
-## Key Capabilities (v1.0.0 Release)
+## Key Capabilities (v1.0.1 Release)
 
 - **Target Input & Scope Validation**: Strict validation and normalization of IPv4 addresses, hostnames, and domain names.
 - **Safe Network Reconnaissance**: Orchestration of Nmap service detection (`-sV`) with structured XML parsing (`ScanResult`, `Host`, `Service`).
@@ -16,10 +16,10 @@ AlaviTrace is an authorized cybersecurity reconnaissance and vulnerability asses
 - **Vulnerability Intelligence & CVE Correlation**: NVD API v2 integration with CPE 2.2/2.3 conversion, local caching, rate-limit resilience, and CVSS extraction.
 - **Controlled Finding Validation Framework**: Safe, non-destructive validation modules verifying reflected parameters, SQL error signatures, path traversal indicators, and CSRF token absence.
 - **Deterministic Prioritization Engine**: Explainable scoring formula combining Severity, CVSS score, Confidence, Service Exposure, and Empirical Validation bonuses.
-- **Deterministic OWASP Top 10 (2021) Coverage Engine**: Honest accounting of 7 supported categories and 3 architectural review boundaries.
+- **Deterministic OWASP Top 10 (2021) Coverage Engine**: Transparent accounting of 7 supported categories and 3 architectural review boundaries.
 - **AI-Assisted Security Analysis**: Google Gemini API integration with prompt injection defenses and automated sensitive data sanitization (passwords, tokens, keys).
-- **Multi-Format Reporting Engine**: Generates canonical machine-readable JSON, developer-ready Markdown, and standalone interactive HTML dashboards.
-- **100% Offline Test Suite**: **234 automated unit tests** passing in ~2.0 seconds with zero-socket offline regression validation.
+- **Multi-Format Reporting Engine**: Generates canonical machine-readable JSON, developer-ready Markdown, and standalone interactive HTML dashboards with context-aware HTML entity escaping.
+- **100% Offline Test Suite**: **248 automated unit tests** passing in ~1.9 seconds with zero-socket offline regression validation.
 
 ---
 
@@ -32,6 +32,16 @@ AlaviTrace is an authorized cybersecurity reconnaissance and vulnerability asses
 [Reporting Engine]  <- [Gemini AI Analysis] <- [Prioritization] <- [Controlled Validation]
  (JSON / MD / HTML)     (Sanitized Evidence)   (Scoring Formula)    (Non-Destructive Proof)
 ```
+
+---
+
+## Framework Limitations & Scope Boundaries
+
+- **Heuristic & Non-Destructive**: Testing is bounded and non-destructive. AlaviTrace does not perform automated exploitation, remote code execution (RCE), reverse shells, privilege escalation, or lateral movement.
+- **Taxonomy Accounting**: AlaviTrace deterministically assesses 7 OWASP Top 10 categories. The remaining 3 categories (A04 Insecure Design, A08 Software & Data Integrity Failures, A09 Security Logging & Monitoring Failures) represent architectural boundaries requiring white-box source code auditing and threat modeling.
+- **Strict Request Budgets**: Network actions have strict request caps (e.g., max 20 crawl requests, max 10 validation checks) and bounded timeouts to avoid service disruption.
+- **Authentication Scope**: Deep authenticated session workflows, multi-tenant authorization testing, and credential fuzzing are excluded.
+- **Human-in-the-Loop**: All vulnerability intelligence correlations and validation statuses are candidate indicators intended to aid human analysts, not substitute for complete penetration tests.
 
 ---
 
@@ -72,10 +82,10 @@ set GEMINI_API_KEY=your_gemini_api_key  # Windows
 export GEMINI_API_KEY="your_gemini_api_key"  # Linux/macOS
 
 # Standard assessment with OWASP, Attack Surface, and Validation enabled
-python -m alavitrace.cli 192.168.56.106 --owasp --validate --attack-surface --format all
+python -m alavitrace.cli -t 192.168.56.106 --owasp --validate --attack-surface --format all
 
 # Air-gapped / offline assessment
-python -m alavitrace.cli 127.0.0.1 --no-vuln-check --no-ai --format markdown
+python -m alavitrace.cli -t 127.0.0.1 --no-vuln-check --no-ai --format markdown
 ```
 
 ### 3. Running Test Suite

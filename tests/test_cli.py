@@ -23,6 +23,29 @@ def test_parse_args():
     args_misconfig = parse_args(["-t", "192.168.56.106", "--misconfig"])
     assert args_misconfig.misconfig is True
 
+def test_parse_args_target_syntax_and_failures():
+    # Supported syntax: -t <target>
+    args_short = parse_args(["-t", "192.168.56.106"])
+    assert args_short.target == "192.168.56.106"
+
+    # Supported syntax: --target <target>
+    args_long = parse_args(["--target", "192.168.56.106"])
+    assert args_long.target == "192.168.56.106"
+
+    # Supported syntax: --target=<target>
+    args_eq = parse_args(["--target=192.168.56.106"])
+    assert args_eq.target == "192.168.56.106"
+
+    # Failure mode 1: No arguments passed
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args([])
+    assert exc_info.value.code != 0
+
+    # Failure mode 2: Positional argument passed without -t/--target
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(["192.168.56.106"])
+    assert exc_info.value.code != 0
+
 def test_run_pipeline_invalid_target():
     exit_code = run_pipeline("invalid_target_123!!!")
     assert exit_code == 1

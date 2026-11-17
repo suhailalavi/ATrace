@@ -1,3 +1,4 @@
+import html
 import os
 import logging
 from datetime import datetime
@@ -8,6 +9,12 @@ from alavitrace.ai.models import AIAnalysisResult
 from alavitrace.analysis.prioritization import PrioritizationResult
 
 logger = logging.getLogger("AlaviTrace")
+
+def _escape(val: Any) -> str:
+    """Escapes text for safe inclusion in HTML bodies and attribute contexts."""
+    if val is None:
+        return ""
+    return html.escape(str(val), quote=True)
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -170,21 +177,24 @@ def generate_html_report(
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = os.path.join(output_dir, f"{filename_prefix}_{timestamp_str}.html")
 
-    target_str = scan_result.target.normalized
+    target_str = _escape(scan_result.target.normalized)
     prioritized_findings = prioritization_result.prioritized_findings
 
     # 1. AI Section HTML
     ai_html = ""
     if ai_analysis and ai_analysis.is_available:
-        obs_html = "".join([f"<li>{obs}</li>" for obs in ai_analysis.key_observations])
-        prio_html = "".join([f"<li>{prio}</li>" for prio in ai_analysis.investigation_priorities])
-        rem_html = "".join([f"<li>{rem}</li>" for rem in ai_analysis.remediation_summary])
+        obs_html = "".join([f"<li>{_escape(obs)}</li>" for obs in ai_analysis.key_observations])
+        prio_html = "".join([f"<li>{_escape(prio)}</li>" for prio in ai_analysis.investigation_priorities])
+        rem_html = "".join([f"<li>{_escape(rem)}</li>" for rem in ai_analysis.remediation_summary])
+
+        exec_summary = _escape(ai_analysis.executive_summary)
+        surface_summary = _escape(ai_analysis.attack_surface_summary)
 
         ai_html = f"""
         <div class="card">
             <h2>AI-Assisted Security Analysis</h2>
-            <p><strong>Executive Summary:</strong> {ai_analysis.executive_summary}</p>
-            <p><strong>Attack Surface Overview:</strong> {ai_analysis.attack_surface_summary}</p>
+            <p><strong>Executive Summary:</strong> {exec_summary}</p>
+            <p><strong>Attack Surface Overview:</strong> {surface_summary}</p>
 
             {"<h3>Key Observations</h3><ul>" + obs_html + "</ul>" if obs_html else ""}
             {"<h3>Investigation Priorities</h3><ol>" + prio_html + "</ol>" if prio_html else ""}
@@ -195,12 +205,17 @@ def generate_html_report(
     # 2. Reconnaissance Content HTML
     recon_lines = []
     for host in scan_result.hosts:
-        host_ip = host.ipv4 or host.target.normalized
-        recon_lines.append(f"<h3>Host: <span class='code'>{host_ip}</span> (Status: {host.state.upper()})</h3>")
+        host_ip = _escape(host.ipv4 or host.target.normalized)
+        host_state = _escape(host.state.upper())
+        recon_lines.append(f"<h3>Host: <span class='code'>{host_ip}</span> (Status: {host_state})</h3>")
         recon_lines.append("<table><thead><tr><th>Port</th><th>Service</th><th>Product</th><th>Version</th><th>CPE</th></tr></thead><tbody>")
         for s in host.open_ports:
-            cpe_str = ", ".join(s.cpes) if s.cpes else "N/A"
-            recon_lines.append(f"<tr><td><span class='code'>{s.port}/{s.protocol}</span></td><td>{s.name}</td><td>{s.product}</td><td>{s.version}</td><td><span class='code'>{cpe_str}</span></td></tr>")
+            cpe_str = _escape(", ".join(s.cpes)) if s.cpes else "N/A"
+            port_proto = f"{s.port}/{_escape(s.protocol)}"
+            name_escaped = _escape(s.name)
+            product_escaped = _escape(s.product)
+            version_escaped = _escape(s.version)
+            recon_lines.append(f"<tr><td><span class='code'>{port_proto}</span></td><td>{name_escaped}</td><td>{product_escaped}</td><td>{version_escaped}</td><td><span class='code'>{cpe_str}</span></td></tr>")
         recon_lines.append("</tbody></table>")
 
     recon_content = "".join(recon_lines)
@@ -210,13 +225,16 @@ def generate_html_report(
     if http_results:
         http_cards = []
         for h in http_results:
+            h_url = _escape(h.url)
             if h.error_message:
-                http_cards.append(f"<p>URL: <span class='code'>{h.url}</span> - Error: {h.error_message}</p>")
+                h_err = _escape(h.error_message)
+                http_cards.append(f"<p>URL: <span class='code'>{h_url}</span> - Error: {h_err}</p>")
                 continue
-            missing_str = ", ".join(h.missing_security_headers) if h.missing_security_headers else "None"
+            missing_str = _escape(", ".join(h.missing_security_headers)) if h.missing_security_headers else "None"
+            server_str = _escape(h.server_header or 'N/A')
             http_cards.append(f"""
-            <p>URL: <span class='code'>{h.url}</span> | Status: {h.status_code} | Latency: {h.response_time_ms}ms</p>
-            <p>Server Header: <span class='code'>{h.server_header or 'N/A'}</span> | Missing Headers: <span class='code'>{missing_str}</span></p>
+            <p>URL: <span class='code'>{h_url}</span> | Status: {h.status_code} | Latency: {h.response_time_ms}ms</p>
+            <p>Server Header: <span class='code'>{server_str}</span> | Missing Headers: <span class='code'>{missing_str}</span></p>
             """)
         http_html = f"<div class='card'><h2>Passive HTTP Enumeration</h2>{''.join(http_cards)}</div>"
 
@@ -225,21 +243,25 @@ def generate_html_report(
     if attack_surface:
         tech_badges = []
         for t in getattr(attack_surface, "technologies", []):
-            ver = f" {t.version}" if getattr(t, "version", None) else ""
-            tech_badges.append(f"<span class='badge badge-LOW'>{t.name}{ver}</span>")
+            t_name = _escape(t.name)
+            ver = f" {_escape(t.version)}" if getattr(t, "version", None) else ""
+            tech_badges.append(f"<span class='badge badge-LOW'>{t_name}{ver}</span>")
         tech_html = " ".join(tech_badges) if tech_badges else "<em>None detected</em>"
 
         ep_rows = []
         for ep in getattr(attack_surface, "endpoints", [])[:30]:
-            p_str = ", ".join(f"<span class='code'>{p}</span>" for p in ep.parameters) if ep.parameters else "-"
-            st = f"<span class='code'>{ep.status_code}</span>" if ep.status_code else "-"
+            p_str = ", ".join(f"<span class='code'>{_escape(p)}</span>" for p in ep.parameters) if ep.parameters else "-"
+            st = f"<span class='code'>{_escape(ep.status_code)}</span>" if ep.status_code else "-"
+            ep_method = _escape(ep.method)
+            ep_path = _escape(ep.path)
+            ep_source = _escape(ep.source)
             ep_rows.append(f"""
             <tr>
-                <td><strong>{ep.method}</strong></td>
-                <td><span class='code'>{ep.path}</span></td>
+                <td><strong>{ep_method}</strong></td>
+                <td><span class='code'>{ep_path}</span></td>
                 <td>{st}</td>
                 <td>{p_str}</td>
-                <td><small style='color: #64748b;'>{ep.source}</small></td>
+                <td><small style='color: #64748b;'>{ep_source}</small></td>
             </tr>
             """)
         ep_table = f"""
@@ -331,16 +353,22 @@ def generate_html_report(
                 owasp_rows = []
                 for f in owasp_findings:
                     sev_class = f"badge-{f.severity.name}"
-                    owasp_cat = f.owasp_category or "N/A"
-                    lim = getattr(f, "limitations", "") or "Manual validation required."
+                    sev_val = _escape(f.severity.value)
+                    f_title = _escape(f.title)
+                    owasp_cat = _escape(f.owasp_category or "N/A")
+                    endpoint_val = _escape(f.endpoint or f.affected_asset)
+                    evidence_val = _escape(f.evidence)
+                    rec_val = _escape(f.recommendation)
+                    lim_raw = getattr(f, "limitations", "") or "Manual validation required."
+                    lim_val = _escape(lim_raw)
                     owasp_rows.append(f"""
                     <tr>
-                        <td><span class="badge {sev_class}">{f.severity.value}</span></td>
-                        <td><strong>{f.title}</strong><br><small style="color: #64748b;">{owasp_cat}</small></td>
-                        <td><span class="code">{f.endpoint or f.affected_asset}</span></td>
-                        <td>{f.evidence}</td>
-                        <td>{f.recommendation}</td>
-                        <td><small style="color: #64748b;">{lim}</small></td>
+                        <td><span class="badge {sev_class}">{sev_val}</span></td>
+                        <td><strong>{f_title}</strong><br><small style="color: #64748b;">{owasp_cat}</small></td>
+                        <td><span class="code">{endpoint_val}</span></td>
+                        <td>{evidence_val}</td>
+                        <td>{rec_val}</td>
+                        <td><small style="color: #64748b;">{lim_val}</small></td>
                     </tr>
                     """)
                 owasp_html = f"""
@@ -373,24 +401,33 @@ def generate_html_report(
         finding_rows = []
         for f in prioritized_findings:
             sev_class = f"badge-{f.severity.name}"
+            sev_val = _escape(f.severity.value)
+            f_title = _escape(f.title)
+            f_id = _escape(f.id)
+            f_asset = _escape(f.affected_asset)
+            f_evidence = _escape(f.evidence)
+            f_rec = _escape(f.recommendation)
+
             val_td = ""
             if has_validation:
                 if getattr(f, "validation_result", None):
                     vr = f.validation_result
                     val_class = f"badge-{vr.status.value}"
-                    lim_html = f"<br><small style='color: #94a3b8; font-style: italic;'>{vr.limitations}</small>" if getattr(vr, "limitations", None) else ""
-                    val_td = f"<td><span class='badge {val_class}'>{vr.status.value}</span><br><small style='color: #64748b;'>{vr.validation_method}</small>{lim_html}</td>"
+                    val_status = _escape(vr.status.value)
+                    val_method = _escape(vr.validation_method)
+                    lim_html = f"<br><small style='color: #94a3b8; font-style: italic;'>{_escape(vr.limitations)}</small>" if getattr(vr, "limitations", None) else ""
+                    val_td = f"<td><span class='badge {val_class}'>{val_status}</span><br><small style='color: #64748b;'>{val_method}</small>{lim_html}</td>"
                 else:
                     val_td = "<td><small style='color: #64748b;'>N/A</small></td>"
 
             finding_rows.append(f"""
             <tr>
-                <td><span class="badge {sev_class}">{f.severity.value}</span></td>
-                <td><strong>{f.title}</strong><br><small>{f.id}</small></td>
+                <td><span class="badge {sev_class}">{sev_val}</span></td>
+                <td><strong>{f_title}</strong><br><small>{f_id}</small></td>
                 {val_td}
-                <td><span class="code">{f.affected_asset}</span></td>
-                <td>{f.evidence}</td>
-                <td>{f.recommendation}</td>
+                <td><span class="code">{f_asset}</span></td>
+                <td>{f_evidence}</td>
+                <td>{f_rec}</td>
             </tr>
             """)
         val_th = "<th>Validation Status</th>" if has_validation else ""
@@ -420,8 +457,11 @@ def generate_html_report(
     cov_rows = []
     for code, item in owasp_cov.categories.items():
         supp_badge = "<span class='badge badge-VALIDATED'>Supported</span>" if item.support_level == "Supported" else "<span class='badge badge-INFO'>Architectural Review</span>"
-        caps = "; ".join(item.capabilities[:2]) if item.capabilities else item.limitations[0][:75] + "..."
-        cov_rows.append(f"<tr><td><span class='code'>{item.code}</span></td><td>{item.name}</td><td>{supp_badge}</td><td>{item.findings_count}</td><td><small>{caps}</small></td></tr>")
+        caps_raw = "; ".join(item.capabilities[:2]) if item.capabilities else item.limitations[0][:75] + "..."
+        code_val = _escape(item.code)
+        name_val = _escape(item.name)
+        caps_val = _escape(caps_raw)
+        cov_rows.append(f"<tr><td><span class='code'>{code_val}</span></td><td>{name_val}</td><td>{supp_badge}</td><td>{item.findings_count}</td><td><small>{caps_val}</small></td></tr>")
 
     cov_table = f"""
     <div class='card'>
