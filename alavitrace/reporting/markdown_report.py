@@ -90,8 +90,18 @@ def generate_markdown_report(
     lines.append(f"| **Validated Findings** | {val_cnt} |")
     tot_ports = sum(len(h.open_ports) for h in scan_result.hosts)
     lines.append(f"| **Discovered Services** | {tot_ports} |")
-    if attack_surface:
-        lines.append(f"| **Discovered Web Endpoints** | {len(getattr(attack_surface, 'endpoints', []))} |")
+
+    discovered_urls = set()
+    for hr in (http_results or []):
+        if getattr(hr, "url", None):
+            discovered_urls.add(hr.url.rstrip("/"))
+        if getattr(hr, "final_url", None):
+            discovered_urls.add(hr.final_url.rstrip("/"))
+    if attack_surface and getattr(attack_surface, "endpoints", None):
+        for ep in attack_surface.endpoints:
+            if getattr(ep, "url", None):
+                discovered_urls.add(ep.url.rstrip("/"))
+    lines.append(f"| **Discovered Web Endpoints** | {len(discovered_urls)} |")
     lines.append("")
 
     # 2. AI Security Analysis Section (if available)
@@ -211,6 +221,9 @@ def generate_markdown_report(
                 flag_str = f" **[{red.flag}]**" if getattr(red, 'flag', None) else ""
                 lines.append(f"- `{red.source_url}` -> `{red.target_url}`{flag_str}")
             lines.append("")
+    else:
+        lines.append("## Attack Surface & Web Endpoint Discovery")
+        lines.append(f"> [!NOTE]\n> Attack surface mapping was not executed for this assessment (`--attack-surface` omitted). Passive HTTP enumeration evaluated {len(discovered_urls)} endpoint(s).\n")
 
     # 5. OWASP Web Security Assessment
     if owasp_result:
@@ -218,28 +231,56 @@ def generate_markdown_report(
         if not getattr(owasp_result, "is_http_available", False):
             lines.append("No HTTP/HTTPS service detected; OWASP web assessment skipped.\n")
         else:
-            owasp_findings = getattr(owasp_result, "findings", [])
-            if not owasp_findings:
+            all_fs = prioritization_result.all_findings
+            owasp_res_findings = getattr(owasp_result, "findings", []) if owasp_result else []
+            seen_ids = set(f.id for f in all_fs)
+            combined_fs = list(all_fs)
+            for of in owasp_res_findings:
+                if of.id not in seen_ids:
+                    seen_ids.add(of.id)
+                    combined_fs.append(of)
+
+            owasp_mapped = [
+                f for f in combined_fs
+                if getattr(f, "owasp_category", None) or getattr(f, "category", "") in ["OWASP Web Security", "Web Security Configuration"]
+            ]
+            if not owasp_mapped:
                 lines.append("No specific OWASP web vulnerabilities identified.\n")
             else:
-                crit = sum(1 for f in owasp_findings if f.severity == Severity.CRITICAL)
-                high = sum(1 for f in owasp_findings if f.severity == Severity.HIGH)
-                med = sum(1 for f in owasp_findings if f.severity == Severity.MEDIUM)
-                low = sum(1 for f in owasp_findings if f.severity == Severity.LOW)
-                info = sum(1 for f in owasp_findings if f.severity == Severity.INFO)
-                lines.append(f"**Total Findings:** {len(owasp_findings)} | **Critical:** {crit} | **High:** {high} | **Medium:** {med} | **Low:** {low} | **Informational:** {info}\n")
-                lines.append("> [!NOTE]\n> OWASP web security findings represent deterministic, non-destructive heuristic indicators. Candidate findings require manual validation.\n")
-                lines.append("| Severity | Finding Title | OWASP Category | Confidence | Endpoint | Evidence | Limitations |")
-                lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
-                for f in owasp_findings:
-                    sev_badge = f"**{f.severity.value.upper()}**"
-                    owasp_cat = f.owasp_category or "N/A"
-                    lim = getattr(f, "limitations", "") or "Manual verification required."
-                    lines.append(f"| {sev_badge} | {f.title} | {owasp_cat} | {f.confidence.value} | `{f.endpoint or f.affected_asset}` | {f.evidence} | {lim} |")
-                lines.append("")
+                crit = sum(1 for f in owasp_mapped if f.severity == Severity.CRITICAL)
+                high = sum(1 for f in owasp_mapped if f.severity == Severity.HIGH)
+                med = sum(1 for f in owasp_mapped if f.severity == Severity.MEDIUM)
+                low = sum(1 for f in owasp_mapped if f.severity == Severity.LOW)
+                info = sum(1 for f in owasp_mapped if f.severity == Severity.INFO)
+                lines.append(f"**Total Findings:** {len(owasp_mapped)} | **Critical:** {crit} | **High:** {high} | **Medium:** {med} | **Low:** {low} | **Informational:** {info}\n")
+                lines.append("> [!NOTE]\n> OWASP web security findings represent deterministic, non-destructive heuristic indicators and passive configuration checks. Candidate findings require manual validation.\n")
+
+                # Separate Application Security Findings from Passive Security Header Observations
+                app_findings = [f for f in owasp_mapped if getattr(f, "source", "") != "AlaviTrace Security Header Rules"]
+                header_findings = [f for f in owasp_mapped if getattr(f, "source", "") == "AlaviTrace Security Header Rules"]
+
+                if app_findings:
+                    lines.append(f"### Application Security Findings ({len(app_findings)})")
+                    lines.append("| Severity | Finding Title | OWASP Category | Confidence | Endpoint | Evidence | Limitations |")
+                    lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+                    for f in app_findings:
+                        sev_badge = f"**{f.severity.value.upper()}**"
+                        owasp_cat = f.owasp_category or "N/A"
+                        lim = getattr(f, "limitations", "") or "Manual verification required."
+                        lines.append(f"| {sev_badge} | {f.title} | {owasp_cat} | {f.confidence.value} | `{f.endpoint or f.affected_asset}` | {f.evidence} | {lim} |")
+                    lines.append("")
+
+                if header_findings:
+                    lines.append(f"### Passive Security Header Observations ({len(header_findings)} A05 Misconfigurations)")
+                    lines.append("| Severity | Finding Title | Target / Endpoint | Evidence | Recommendation |")
+                    lines.append("| :--- | :--- | :--- | :--- | :--- |")
+                    for f in header_findings:
+                        sev_badge = f"**{f.severity.value.upper()}**"
+                        lines.append(f"| {sev_badge} | {f.title} | `{f.affected_asset or f.endpoint}` | {f.evidence} | {f.recommendation} |")
+                    lines.append("")
 
                 a03_findings = [
-                    f for f in owasp_findings
+                    f for f in owasp_mapped
                     if (getattr(f, "owasp_category", None) and "A03" in f.owasp_category)
                     or "Injection" in f.title or "XSS" in f.title
                 ]
@@ -254,7 +295,7 @@ def generate_markdown_report(
                     lines.append(f"- **Command Injection Candidates:** {cmd}\n")
 
                 a05_findings = [
-                    f for f in owasp_findings
+                    f for f in owasp_mapped
                     if getattr(f, "owasp_category", None) and "A05" in f.owasp_category
                 ]
                 if a05_findings:
@@ -265,7 +306,7 @@ def generate_markdown_report(
                     lines.append("")
 
                 a06_findings = [
-                    f for f in owasp_findings
+                    f for f in owasp_mapped
                     if getattr(f, "owasp_category", None) and "A06" in f.owasp_category
                 ]
                 if a06_findings:

@@ -82,10 +82,26 @@ def test_detect_cryptographic_failures_cleartext(mock_web_context):
     findings = detect_cryptographic_failures(mock_web_context)
     cleartext_finding = next((f for f in findings if "Cleartext HTTP" in f.title), None)
     assert cleartext_finding is not None
-    assert cleartext_finding.severity == Severity.MEDIUM
-    assert cleartext_finding.confidence == Confidence.CONFIRMED
+    assert cleartext_finding.severity == Severity.LOW
+    assert cleartext_finding.confidence == Confidence.OBSERVED
     assert cleartext_finding.owasp_category == OwaspCategory.A02_2021.value
     assert "Enforce TLS" in cleartext_finding.recommendation
+    assert "No sensitive input forms" in cleartext_finding.evidence
+
+def test_detect_cryptographic_failures_cleartext_with_sensitive_form():
+    target = Target(raw_input="192.168.56.106", normalized="192.168.56.106", target_type="IPv4")
+    http_res = HttpResult(
+        url="http://192.168.56.106",
+        status_code=200,
+        forms=[{"action": "/login", "method": "POST", "has_password": True}]
+    )
+    context = AssessmentContext(target=target, scan_result=ScanResult(target=target), http_results=[http_res])
+    findings = detect_cryptographic_failures(context)
+    cleartext_finding = next((f for f in findings if "Cleartext" in f.title), None)
+    assert cleartext_finding is not None
+    assert cleartext_finding.severity == Severity.MEDIUM
+    assert cleartext_finding.confidence == Confidence.CONFIRMED
+    assert "password" in cleartext_finding.evidence.lower()
 
 def test_detect_cryptographic_failures_https_hsts():
     target = Target(raw_input="192.168.56.106", normalized="192.168.56.106", target_type="IPv4")

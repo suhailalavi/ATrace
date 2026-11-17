@@ -52,13 +52,13 @@ OWASP_TAXONOMY_DEFINITIONS = {
         "support_level": "Supported",
         "capabilities": [
             "Directory listing exposure checks",
-            "Sensitive path identification (e.g., .git, .env, backups, admin panels)",
+            "Sensitive path heuristic discovery (e.g., .git, .env, backups, admin panels) — candidate access-control indicators",
             "Disallowed paths extraction from robots.txt",
             "Path traversal candidate parameter validation",
             "CSRF token absence detection on HTML state-changing forms"
         ],
         "limitations": [
-            "Automated black-box testing cannot evaluate multi-tenant data isolation or vertical/horizontal authorization logic without authenticated role contexts."
+            "Sensitive path discovery identifies candidate exposure locations; it does not prove authorization bypass or privilege escalation. Automated black-box testing cannot evaluate multi-tenant data isolation or vertical/horizontal authorization logic without authenticated role contexts."
         ]
     },
     "A02:2021": {
@@ -66,11 +66,11 @@ OWASP_TAXONOMY_DEFINITIONS = {
         "support_level": "Supported",
         "capabilities": [
             "TLS certificate expiration and issuer inspection",
-            "Cleartext HTTP transport detection for sensitive services",
+            "Cleartext HTTP transport detection (differentiating general unencrypted HTTP from sensitive credential transmission)",
             "Sensitive cookies transmitted over unencrypted HTTP without Secure flag"
         ],
         "limitations": [
-            "Internal cryptographic algorithms, secret key management, and cryptographic entropy cannot be evaluated from external network probes."
+            "Cleartext HTTP detection evaluates transport encryption; it does not assume confidential data exposure on non-sensitive endpoints without credentials. Internal cryptographic algorithms, key management, and cryptographic entropy cannot be evaluated from external network probes."
         ]
     },
     "A03:2021": {
@@ -78,11 +78,11 @@ OWASP_TAXONOMY_DEFINITIONS = {
         "support_level": "Supported",
         "capabilities": [
             "Deterministic SQL error signature detection across multiple database engines",
-            "Reflected parameter validation for cross-site scripting (XSS) characters",
+            "Reflected parameter validation for cross-site scripting (XSS) canary characters (identifies reflection context, not proof of exploitable XSS)",
             "Command injection character reflection detection"
         ],
         "limitations": [
-            "Destructive SQL injection, out-of-band injection, and second-order blind injection are intentionally out of scope to prevent target data loss or downtime."
+            "Reflected canary characters demonstrate reflection and lack of output encoding; they do not confirm executable cross-site scripting (XSS) or browser script execution context. Destructive SQL injection, out-of-band injection, and second-order blind injection are intentionally out of scope to prevent target data loss or downtime."
         ]
     },
     "A04:2021": {
@@ -152,11 +152,11 @@ OWASP_TAXONOMY_DEFINITIONS = {
         "name": "Server-Side Request Forgery (SSRF)",
         "support_level": "Supported",
         "capabilities": [
-            "Discovery of URL/URI-accepting parameters (e.g., dest, redirect, url, target, callback)",
+            "Discovery of URL/URI-accepting parameters (e.g., dest, redirect, url, target, callback) — candidate SSRF attack surface",
             "Detection of open redirection behaviors on HTTP endpoints"
         ],
         "limitations": [
-            "Internal intranet requests, cloud metadata service probing, and out-of-band callback triggers are not executed to prevent unintended infrastructure disruption."
+            "Parameter discovery identifies candidate input vectors only and does not prove server-side request execution. Internal intranet requests, cloud metadata service probing, and out-of-band callback triggers are not executed to prevent unintended infrastructure disruption."
         ]
     }
 }
@@ -215,8 +215,9 @@ def get_owasp_coverage_summary(findings: List[Finding]) -> OWASPCoverage:
             total_mapped += 1
 
     notes = [
-        "7 of 10 OWASP Top 10 (2021) categories are actively supported via deterministic detection & validation.",
-        "3 categories (A04: Insecure Design, A08: Software/Data Integrity, A09: Logging/Monitoring) require architectural review, threat modeling, or source code audit and cannot be reliably evaluated via external black-box scanning."
+        "7 of 10 OWASP Top 10 (2021) categories have implemented passive detection heuristics or active validation modules.",
+        "3 categories (A04: Insecure Design, A08: Software/Data Integrity, A09: Logging/Monitoring) require architectural review, threat modeling, or source code audit and cannot be reliably evaluated via external black-box scanning.",
+        "Heuristic observations (such as candidate URL parameters, reflected characters, or sensitive paths) represent attack-surface indicators, not confirmed vulnerabilities, unless verified by active validation modules."
     ]
 
     return OWASPCoverage(

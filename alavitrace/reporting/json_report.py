@@ -131,47 +131,74 @@ def generate_json_report(
             "limitations": ai_analysis.limitations
         }
 
+    owasp_res_findings = [format_finding(f) for f in getattr(owasp_result, "findings", [])] if owasp_result else []
+    seen_ids = set(f["id"] for f in all_findings_data)
+    combined_findings_data = list(all_findings_data)
+    for of in owasp_res_findings:
+        if of["id"] not in seen_ids:
+            seen_ids.add(of["id"])
+            combined_findings_data.append(of)
+
+    owasp_all = [
+        f for f in combined_findings_data
+        if f.get("owasp_category") or f.get("category") in ["OWASP Web Security", "Web Security Configuration"]
+    ]
+    app_findings_data = [f for f in owasp_all if f.get("source") != "AlaviTrace Security Header Rules"]
+    header_findings_data = [f for f in owasp_all if f.get("source") == "AlaviTrace Security Header Rules"]
+
+    a05_all = [f for f in combined_findings_data if f.get("owasp_category") and "A05" in f["owasp_category"]]
+    a06_all = [f for f in combined_findings_data if f.get("owasp_category") and "A06" in f["owasp_category"]]
+
     owasp_data = None
     a03_injection_data = None
     if owasp_result:
-        owasp_data = owasp_result.to_dict() if hasattr(owasp_result, "to_dict") else {
-            "is_http_available": getattr(owasp_result, "is_http_available", False),
-            "findings_count": len(getattr(owasp_result, "findings", [])),
-            "findings": [format_finding(f) for f in getattr(owasp_result, "findings", [])]
-        }
         a03_findings = [
-            f for f in getattr(owasp_result, "findings", [])
-            if (getattr(f, "owasp_category", None) and "A03" in f.owasp_category)
-            or "Injection" in f.title or "XSS" in f.title
+            f for f in owasp_all
+            if (f.get("owasp_category") and "A03" in f["owasp_category"])
+            or "Injection" in f.get("title", "") or "XSS" in f.get("title", "")
         ]
         a03_injection_data = {
             "total_candidates": len(a03_findings),
-            "sqli_candidates": sum(1 for f in a03_findings if "SQL" in f.title),
-            "xss_candidates": sum(1 for f in a03_findings if "XSS" in f.title),
-            "command_candidates": sum(1 for f in a03_findings if "Command" in f.title),
-            "findings": [format_finding(f) for f in a03_findings]
-        }
-        a05_findings = [
-            f for f in getattr(owasp_result, "findings", [])
-            if getattr(f, "owasp_category", None) and "A05" in f.owasp_category
-        ]
-        a06_findings = [
-            f for f in getattr(owasp_result, "findings", [])
-            if getattr(f, "owasp_category", None) and "A06" in f.owasp_category
-        ]
-
-        owasp_data["a03_injection"] = a03_injection_data
-        owasp_data["a05_misconfiguration"] = {
-            "total_count": len(a05_findings),
-            "findings": [format_finding(f) for f in a05_findings]
-        }
-        owasp_data["a06_vulnerable_components"] = {
-            "total_count": len(a06_findings),
-            "findings": [format_finding(f) for f in a06_findings]
+            "sqli_candidates": sum(1 for f in a03_findings if "SQL" in f.get("title", "")),
+            "xss_candidates": sum(1 for f in a03_findings if "XSS" in f.get("title", "")),
+            "command_candidates": sum(1 for f in a03_findings if "Command" in f.get("title", "")),
+            "findings": a03_findings
         }
 
-    a05_all = [f for f in all_findings_data if f.get("owasp_category") and "A05" in f["owasp_category"]]
-    a06_all = [f for f in all_findings_data if f.get("owasp_category") and "A06" in f["owasp_category"]]
+        # Severity breakdown across all unique OWASP-mapped findings
+        summary_by_sev = {
+            "critical": sum(1 for f in owasp_all if f.get("severity") == "Critical"),
+            "high": sum(1 for f in owasp_all if f.get("severity") == "High"),
+            "medium": sum(1 for f in owasp_all if f.get("severity") == "Medium"),
+            "low": sum(1 for f in owasp_all if f.get("severity") == "Low"),
+            "informational": sum(1 for f in owasp_all if f.get("severity") in ["Informational", "Info"]),
+        }
+
+        owasp_data = {
+            "is_http_available": getattr(owasp_result, "is_http_available", False),
+            "supported_categories": getattr(owasp_result, "supported_categories", []),
+            "executed_checks": getattr(owasp_result, "executed_checks", []),
+            "findings_count": len(owasp_all),
+            "summary_by_severity": summary_by_sev,
+            "application_findings_count": len(app_findings_data),
+            "security_header_observations_count": len(header_findings_data),
+            "application_findings": app_findings_data,
+            "security_header_observations": header_findings_data,
+            "findings": owasp_all,
+            "message": getattr(owasp_result, "message", None),
+            "notes": getattr(owasp_result, "notes", []),
+            "a03_injection": a03_injection_data,
+            "a05_misconfiguration": {
+                "total_count": len(a05_all),
+                "security_headers_count": len(header_findings_data),
+                "other_misconfigurations_count": len(a05_all) - len(header_findings_data),
+                "findings": a05_all
+            },
+            "a06_vulnerable_components": {
+                "total_count": len(a06_all),
+                "findings": a06_all
+            }
+        }
 
     from alavitrace.assessment.coverage import get_owasp_coverage_summary
     from alavitrace.core.models import AssessmentSummary, Severity
@@ -192,8 +219,30 @@ def generate_json_report(
         inconc_cnt = sum(1 for f in val_fs if getattr(f.validation_result.status, "value", str(f.validation_result.status)) == "INCONCLUSIVE")
 
         tot_ports = sum(len(h.open_ports) for h in scan_result.hosts)
-        tot_eps = len(getattr(attack_surface, "endpoints", [])) if attack_surface else 0
-        tot_forms = len(getattr(attack_surface, "forms", [])) if attack_surface else 0
+
+        discovered_urls = set()
+        for hr in (http_results or []):
+            if getattr(hr, "url", None):
+                discovered_urls.add(hr.url.rstrip("/"))
+            if getattr(hr, "final_url", None):
+                discovered_urls.add(hr.final_url.rstrip("/"))
+        if attack_surface and getattr(attack_surface, "endpoints", None):
+            for ep in attack_surface.endpoints:
+                if getattr(ep, "url", None):
+                    discovered_urls.add(ep.url.rstrip("/"))
+        tot_eps = len(discovered_urls)
+
+        tot_forms = 0
+        if attack_surface and hasattr(attack_surface, "forms") and attack_surface.forms:
+            tot_forms = len(attack_surface.forms)
+        elif attack_surface and getattr(attack_surface, "endpoints", None):
+            form_eps = [ep for ep in attack_surface.endpoints if getattr(ep, "source", None) == "html_form"]
+            if form_eps:
+                tot_forms = len(form_eps)
+        if tot_forms == 0 and http_results:
+            hr_forms_count = sum(len(getattr(hr, "forms", [])) for hr in http_results)
+            if hr_forms_count > 0:
+                tot_forms = hr_forms_count
 
         if crit > 0:
             overall_rating = "Critical"

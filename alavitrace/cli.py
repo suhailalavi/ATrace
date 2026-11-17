@@ -783,8 +783,32 @@ def run_pipeline(
 
         all_open_services = [s for h in scan_result.hosts for s in h.open_ports]
         tot_services = len(all_open_services)
-        tot_endpoints = len(getattr(attack_surface, "endpoints", [])) if attack_surface else 0
-        tot_forms = len(getattr(attack_surface, "forms", [])) if attack_surface else 0
+
+        # Compute accurate discovered endpoints without relying solely on AttackSurface
+        discovered_urls = set()
+        for hr in (http_results or []):
+            if getattr(hr, "url", None):
+                discovered_urls.add(hr.url.rstrip("/"))
+            if getattr(hr, "final_url", None):
+                discovered_urls.add(hr.final_url.rstrip("/"))
+        if attack_surface and getattr(attack_surface, "endpoints", None):
+            for ep in attack_surface.endpoints:
+                if getattr(ep, "url", None):
+                    discovered_urls.add(ep.url.rstrip("/"))
+        tot_endpoints = len(discovered_urls)
+
+        # Form accounting: count genuine discovered HTML forms
+        tot_forms = 0
+        if attack_surface and hasattr(attack_surface, "forms") and attack_surface.forms:
+            tot_forms = len(attack_surface.forms)
+        elif attack_surface and getattr(attack_surface, "endpoints", None):
+            form_eps = [ep for ep in attack_surface.endpoints if getattr(ep, "source", None) == "html_form"]
+            if form_eps:
+                tot_forms = len(form_eps)
+        if tot_forms == 0 and http_results:
+            hr_forms_count = sum(len(getattr(hr, "forms", [])) for hr in http_results)
+            if hr_forms_count > 0:
+                tot_forms = hr_forms_count
 
         if crit_count > 0:
             overall_rating = "Critical"

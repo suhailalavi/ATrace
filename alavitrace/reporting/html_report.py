@@ -238,6 +238,19 @@ def generate_html_report(
             """)
         http_html = f"<div class='card'><h2>Passive HTTP Enumeration</h2>{''.join(http_cards)}</div>"
 
+    # Compute discovered endpoints
+    discovered_urls = set()
+    for hr in (http_results or []):
+        if getattr(hr, "url", None):
+            discovered_urls.add(hr.url.rstrip("/"))
+        if getattr(hr, "final_url", None):
+            discovered_urls.add(hr.final_url.rstrip("/"))
+    if attack_surface and getattr(attack_surface, "endpoints", None):
+        for ep in attack_surface.endpoints:
+            if getattr(ep, "url", None):
+                discovered_urls.add(ep.url.rstrip("/"))
+    tot_eps = len(discovered_urls)
+
     # Attack Surface HTML (Phase 10)
     attack_surface_html = ""
     if attack_surface:
@@ -292,6 +305,13 @@ def generate_html_report(
             {ep_table}
         </div>
         """
+    else:
+        attack_surface_html = f"""
+        <div class="card">
+            <h2>Attack Surface & Web Endpoint Discovery</h2>
+            <p><em>Attack surface mapping was not executed for this assessment (omitted). Passive HTTP enumeration evaluated {tot_eps} endpoint(s).</em></p>
+        </div>
+        """
 
     # 4. OWASP Web Security Assessment HTML
     owasp_html = ""
@@ -304,8 +324,20 @@ def generate_html_report(
             </div>
             """
         else:
-            owasp_findings = getattr(owasp_result, "findings", [])
-            if not owasp_findings:
+            all_fs = prioritization_result.all_findings
+            owasp_res_findings = getattr(owasp_result, "findings", []) if owasp_result else []
+            seen_ids = set(f.id for f in all_fs)
+            combined_fs = list(all_fs)
+            for of in owasp_res_findings:
+                if of.id not in seen_ids:
+                    seen_ids.add(of.id)
+                    combined_fs.append(of)
+
+            owasp_mapped = [
+                f for f in combined_fs
+                if getattr(f, "owasp_category", None) or getattr(f, "category", "") in ["OWASP Web Security", "Web Security Configuration"]
+            ]
+            if not owasp_mapped:
                 owasp_html = """
                 <div class='card'>
                     <h2>OWASP Web Security Assessment</h2>
@@ -313,14 +345,14 @@ def generate_html_report(
                 </div>
                 """
             else:
-                crit = sum(1 for f in owasp_findings if f.severity == Severity.CRITICAL)
-                high = sum(1 for f in owasp_findings if f.severity == Severity.HIGH)
-                med = sum(1 for f in owasp_findings if f.severity == Severity.MEDIUM)
-                low = sum(1 for f in owasp_findings if f.severity == Severity.LOW)
-                info = sum(1 for f in owasp_findings if f.severity == Severity.INFO)
+                crit = sum(1 for f in owasp_mapped if f.severity == Severity.CRITICAL)
+                high = sum(1 for f in owasp_mapped if f.severity == Severity.HIGH)
+                med = sum(1 for f in owasp_mapped if f.severity == Severity.MEDIUM)
+                low = sum(1 for f in owasp_mapped if f.severity == Severity.LOW)
+                info = sum(1 for f in owasp_mapped if f.severity == Severity.INFO)
 
                 a03_findings = [
-                    f for f in owasp_findings
+                    f for f in owasp_mapped
                     if (getattr(f, "owasp_category", None) and "A03" in f.owasp_category)
                     or "Injection" in f.title or "XSS" in f.title
                 ]
@@ -329,8 +361,13 @@ def generate_html_report(
                     sqli = sum(1 for f in a03_findings if "SQL" in f.title)
                     xss = sum(1 for f in a03_findings if "XSS" in f.title)
                     cmd = sum(1 for f in a03_findings if "Command" in f.title)
-                a05_count = sum(1 for f in owasp_findings if getattr(f, "owasp_category", None) and "A05" in f.owasp_category)
-                a06_count = sum(1 for f in owasp_findings if getattr(f, "owasp_category", None) and "A06" in f.owasp_category)
+                    inj_note = f"""
+                    <p style="margin-bottom: 8px; font-size: 13px; color: #475569;">
+                        <strong>Injection Candidates (A03):</strong> Total: <strong>{len(a03_findings)}</strong> | SQLi: <strong>{sqli}</strong> | XSS: <strong>{xss}</strong> | Command: <strong>{cmd}</strong>
+                    </p>
+                    """
+                a05_count = sum(1 for f in owasp_mapped if getattr(f, "owasp_category", None) and "A05" in f.owasp_category)
+                a06_count = sum(1 for f in owasp_mapped if getattr(f, "owasp_category", None) and "A06" in f.owasp_category)
                 highlights_note = f"""
                 <p style="margin-bottom: 8px; font-size: 13px; color: #475569;">
                     <strong>Key Category Counts:</strong> A05 Misconfigurations: <strong>{a05_count}</strong> | A06 Outdated Components: <strong>{a06_count}</strong> | A03 Injection Candidates: <strong>{len(a03_findings)}</strong>
@@ -351,7 +388,7 @@ def generate_html_report(
                 """
 
                 owasp_rows = []
-                for f in owasp_findings:
+                for f in owasp_mapped:
                     sev_class = f"badge-{f.severity.name}"
                     sev_val = _escape(f.severity.value)
                     f_title = _escape(f.title)
@@ -361,10 +398,11 @@ def generate_html_report(
                     rec_val = _escape(f.recommendation)
                     lim_raw = getattr(f, "limitations", "") or "Manual validation required."
                     lim_val = _escape(lim_raw)
+                    src_val = _escape(getattr(f, "source", "AlaviTrace"))
                     owasp_rows.append(f"""
                     <tr>
                         <td><span class="badge {sev_class}">{sev_val}</span></td>
-                        <td><strong>{f_title}</strong><br><small style="color: #64748b;">{owasp_cat}</small></td>
+                        <td><strong>{f_title}</strong><br><small style="color: #64748b;">{owasp_cat} &bull; <em>{src_val}</em></small></td>
                         <td><span class="code">{endpoint_val}</span></td>
                         <td>{evidence_val}</td>
                         <td>{rec_val}</td>

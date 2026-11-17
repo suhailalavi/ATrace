@@ -1,6 +1,6 @@
 import re
 import logging
-from typing import List, Dict, Set, Optional, Any
+from typing import List, Dict, Set, Optional, Any, Tuple
 
 from alavitrace.core.models import Severity, Confidence, Finding, HttpResult
 from alavitrace.assessment.models import (
@@ -84,24 +84,69 @@ def detect_broken_access_control(context: AssessmentContext) -> List[OWASPFindin
                 if sp in u_lower:
                     findings.append(OWASPFinding.create(
                         id=f"OWASP-A01-SENSITIVE-PATH-{idx}",
-                        title=f"Potential Sensitive Management Path Disclosed ({sp})",
+                        title=f"Sensitive Path Discovered ({sp}) — Candidate Access Control Indicator",
                         owasp_category=OwaspCategory.A01_2021.value,
-                        severity=Severity.MEDIUM,
+                        severity=Severity.LOW,
                         confidence=Confidence.OBSERVED,
-                        description=f"Observed URL path includes administrative or configuration prefix '{sp}'.",
-                        evidence=f"Target URL path or redirect chain exposes sensitive path segment: {u}",
+                        description=(
+                            f"Observed URL path includes administrative or configuration prefix '{sp}'. "
+                            "This identifies a candidate attack-surface location, but does not inherently imply "
+                            "that access controls are broken or bypassed."
+                        ),
+                        evidence=f"Target URL path or redirect chain exposes sensitive path segment '{sp}': {u}",
                         affected_asset=res.url,
                         endpoint=u,
                         http_method="GET",
                         detection_type=DetectionType.PASSIVE.value,
-                        recommendation="Restrict administrative interfaces behind role-based authentication, IP allowlists, or internal networks.",
-                        limitations="Passive identification from observed URL/redirect; authentication bypass was not attempted.",
+                        recommendation="Verify that access control policies, multi-factor authentication, or network-level restrictions properly gate access to administrative paths.",
+                        limitations="Passive identification from observed URL/redirect; authentication bypass, privilege escalation, or unauthorized resource retrieval was not attempted.",
                         references=["https://owasp.org/Top10/A01_2021-Broken_Access_Control/"]
                     ))
                     idx += 1
                     break
 
     return findings
+
+def _has_sensitive_cleartext_exposure(res: HttpResult) -> Tuple[bool, str]:
+    """
+    Evaluates whether a cleartext HTTP endpoint exposes sensitive data vectors
+    such as authentication forms, password fields, credentials in parameters,
+    or authentication management paths.
+    Returns (is_sensitive, evidence_reason).
+    """
+    # 1. Password input or auth forms
+    for form in getattr(res, "forms", []):
+        if form.get("has_password"):
+            return True, f"Cleartext page hosts a form containing password input field(s) with action '{form.get('action', '')}'."
+        action = (form.get("action") or "").lower()
+        if any(auth_kw in action for auth_kw in ["login", "signin", "auth", "session", "password"]):
+            return True, f"Cleartext page hosts an authentication form with action '{form.get('action')}'."
+
+    # 2. Sensitive query parameters
+    sensitive_param_names = {"password", "passwd", "pwd", "token", "secret", "api_key", "apikey", "auth", "session", "key"}
+    observed_sensitive_params = [p for p in getattr(res, "observed_parameters", []) if p.lower() in sensitive_param_names]
+    if observed_sensitive_params:
+        params_str = ", ".join(sorted(observed_sensitive_params))
+        return True, f"Cleartext URL exposes sensitive parameter(s): [{params_str}]."
+
+    # 3. Authentication or credential paths
+    urls_to_check = [res.url] + getattr(res, "redirect_chain", [])
+    if res.final_url:
+        urls_to_check.append(res.final_url)
+    auth_path_keywords = ["/login", "/signin", "/auth", "/authenticate", "/oauth", "/password", "/credential", "/token"]
+    for u in urls_to_check:
+        u_lower = u.lower()
+        for kw in auth_path_keywords:
+            if kw in u_lower:
+                return True, f"Cleartext endpoint path matches sensitive authentication keyword: '{kw}' ({u})."
+
+    # 4. Body sample check for password input
+    if res.body_sample:
+        b_lower = res.body_sample.lower()
+        if 'type="password"' in b_lower or "type='password'" in b_lower:
+            return True, "Cleartext response body contains password input field."
+
+    return False, ""
 
 def detect_cryptographic_failures(context: AssessmentContext) -> List[OWASPFinding]:
     """
@@ -121,25 +166,49 @@ def detect_cryptographic_failures(context: AssessmentContext) -> List[OWASPFindi
 
         # 1. Cleartext HTTP without HTTPS redirection
         if is_cleartext and not redirects_to_https:
-            findings.append(OWASPFinding.create(
-                id=f"OWASP-A02-CLEARTEXT-{idx}",
-                title="Cleartext HTTP Transmission Without Enforced Encryption",
-                owasp_category=OwaspCategory.A02_2021.value,
-                severity=Severity.MEDIUM,
-                confidence=Confidence.CONFIRMED,
-                description=(
-                    "The service communicates over plain HTTP without redirecting to HTTPS, allowing network "
-                    "eavesdropping and man-in-the-middle data interception."
-                ),
-                evidence=f"Endpoint {res.url} responded over cleartext HTTP with status {res.status_code} without redirecting to HTTPS.",
-                affected_asset=res.url,
-                endpoint=endpoint_url,
-                http_method="GET",
-                detection_type=DetectionType.PASSIVE.value,
-                recommendation="Enforce TLS 1.2+ across all web endpoints and configure immediate 301/308 redirects from HTTP to HTTPS.",
-                limitations="Evaluates initial transport scheme and redirect policy. In-depth TLS cipher suite testing requires dedicated handshake auditing.",
-                references=["https://owasp.org/Top10/A02_2021-Cryptographic_Failures/"]
-            ))
+            is_sensitive, sensitive_reason = _has_sensitive_cleartext_exposure(res)
+            if is_sensitive:
+                findings.append(OWASPFinding.create(
+                    id=f"OWASP-A02-CLEARTEXT-{idx}",
+                    title="Cleartext Transmission of Sensitive Information over HTTP",
+                    owasp_category=OwaspCategory.A02_2021.value,
+                    severity=Severity.MEDIUM,
+                    confidence=Confidence.CONFIRMED,
+                    description=(
+                        "The endpoint communicates over unencrypted HTTP while transmitting, handling, or exposing "
+                        "sensitive authentication interfaces, credentials, or session parameters, allowing network "
+                        "eavesdropping and credential interception."
+                    ),
+                    evidence=f"Endpoint {res.url} responded over cleartext HTTP with status {res.status_code}. {sensitive_reason}",
+                    affected_asset=res.url,
+                    endpoint=endpoint_url,
+                    http_method="GET",
+                    detection_type=DetectionType.PASSIVE.value,
+                    recommendation="Enforce TLS 1.2+ across all web endpoints and configure immediate 301/308 redirects from HTTP to HTTPS. Transmit all sensitive credentials and session data exclusively over HTTPS.",
+                    limitations="Evaluates initial transport scheme and observed sensitive forms/parameters. In-depth TLS cipher suite testing requires dedicated handshake auditing.",
+                    references=["https://owasp.org/Top10/A02_2021-Cryptographic_Failures/"]
+                ))
+            else:
+                findings.append(OWASPFinding.create(
+                    id=f"OWASP-A02-CLEARTEXT-{idx}",
+                    title="Cleartext HTTP Service Without Enforced HTTPS",
+                    owasp_category=OwaspCategory.A02_2021.value,
+                    severity=Severity.LOW,
+                    confidence=Confidence.OBSERVED,
+                    description=(
+                        "The service communicates over unencrypted HTTP without automatic redirection to HTTPS. "
+                        "While no credentials or sensitive input fields were observed on this endpoint, unencrypted "
+                        "traffic remains susceptible to network traffic inspection or manipulation."
+                    ),
+                    evidence=f"Endpoint {res.url} responded over cleartext HTTP with status {res.status_code} without redirecting to HTTPS. No sensitive input forms, credentials, or authentication parameters were observed on this endpoint.",
+                    affected_asset=res.url,
+                    endpoint=endpoint_url,
+                    http_method="GET",
+                    detection_type=DetectionType.PASSIVE.value,
+                    recommendation="Enforce TLS 1.2+ across all web endpoints and configure immediate 301/308 redirects from HTTP to HTTPS.",
+                    limitations="Evaluates unencrypted transport. In the absence of sensitive input forms, login paths, or confidential data transmission, cleartext HTTP exposure does not inherently imply immediate credential or sensitive data theft.",
+                    references=["https://owasp.org/Top10/A02_2021-Cryptographic_Failures/"]
+                ))
             idx += 1
 
         # 2. Missing HSTS over HTTPS
@@ -795,7 +864,8 @@ def detect_ssrf_indicators(context: AssessmentContext) -> List[OWASPFinding]:
                 confidence=Confidence.POTENTIAL,
                 description=(
                     "The endpoint accepts input parameter(s) commonly associated with remote URL fetching or redirection. "
-                    "If processed server-side without validation, this could enable Server-Side Request Forgery (SSRF)."
+                    "This identifies a candidate input vector, but does NOT prove server-side request forgery or internal "
+                    "network reachability without active verification."
                 ),
                 evidence=f"Observed SSRF candidate parameter(s) [{param_list_str}] on endpoint {endpoint_url}.",
                 affected_asset=res.url,
@@ -804,7 +874,7 @@ def detect_ssrf_indicators(context: AssessmentContext) -> List[OWASPFinding]:
                 parameter=param_list_str,
                 detection_type=DetectionType.PASSIVE.value,
                 recommendation="Enforce strict allowlists for destination domains and disallow private IP ranges (RFC 1918, 127.0.0.0/8, 169.254.169.254).",
-                limitations="Parameter name heuristic only. No outbound network requests or payloads were sent. Requires manual validation.",
+                limitations="Parameter name heuristic only. Parameter discovery identifies candidate inputs but does not demonstrate outbound request generation or internal network access.",
                 references=["https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/"]
             ))
             idx += 1
